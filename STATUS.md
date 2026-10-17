@@ -25,7 +25,7 @@
 | B-4 | done | agent | 6ca46b0 | Error serialization |
 | B-5 | done | agent | d3d62ab | Event emitter and process lifecycle |
 | B-6 | done | agent | cd3031a | TDD and QUnit interfaces |
-| B-7 | todo | | | Globals leak check and misc flags |
+| B-7 | done | agent | db10fff | Globals leak check and misc flags |
 | R-1 | todo | | | Event model and reporter trait |
 | R-2 | todo | | | Ordered event merging |
 | R-3 | todo | | | Spec, dot, min, list, tap reporters |
