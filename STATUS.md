@@ -19,7 +19,7 @@
 | A-5 | done | agent | dba1b9e | Disk cache |
 | A-6 | done | agent | 0b1062c | Node loader |
 | A-7 | done | agent | e31d8c4 | Stock-Mocha compatibility mode |
-| B-1 | todo | | | Harness core: suite tree builder |
+| B-1 | done | agent | 257ae10 | Harness core: suite tree builder |
 | B-2 | todo | | | Runner: ordering and hook semantics |
 | B-3 | todo | | | Async and timeout handling |
 | B-4 | todo | | | Error serialization |
