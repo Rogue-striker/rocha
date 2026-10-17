@@ -12,6 +12,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
+pub mod cache;
+pub use cache::*;
+
 /// Transformation and tsconfig errors.
 #[derive(Debug, Error)]
 pub enum TransformError {
