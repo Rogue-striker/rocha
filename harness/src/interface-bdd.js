@@ -29,10 +29,28 @@ class Test {
     this.suite = suite;
     this.pending = !fn || (suite ? suite.isPending() : false);
     this._only = false;
-    this.timeout = suite ? suite.timeout : 2000;
-    this.slow = suite ? suite.slow : 75;
-    this.retries = suite ? suite.retries : 0;
+    this._timeout = suite ? (typeof suite.timeout === "function" ? suite.timeout() : suite.timeout) : 2000;
+    this._slow = suite ? (typeof suite.slow === "function" ? suite.slow() : suite.slow) : 75;
+    this._retries = suite ? (typeof suite.retries === "function" ? suite.retries() : suite.retries) : 0;
     this.file = suite ? suite.file : '';
+  }
+
+  timeout(ms) {
+    if (arguments.length === 0) return this._timeout !== undefined ? this._timeout : 2000;
+    this._timeout = Number(ms);
+    return this;
+  }
+
+  slow(ms) {
+    if (arguments.length === 0) return this._slow !== undefined ? this._slow : 75;
+    this._slow = Number(ms);
+    return this;
+  }
+
+  retries(n) {
+    if (arguments.length === 0) return this._retries !== undefined ? this._retries : 0;
+    this._retries = Number(n);
+    return this;
   }
 
   isPending() {
@@ -64,11 +82,29 @@ class Suite {
     this._only = false;
     this._onlySuites = [];
     this._onlyTests = [];
-    this.timeout = parent ? parent.timeout : 2000;
-    this.slow = parent ? parent.slow : 75;
-    this.retries = parent ? parent.retries : 0;
+    this._timeout = parent ? (typeof parent.timeout === "function" ? parent.timeout() : parent.timeout) : 2000;
+    this._slow = parent ? (typeof parent.slow === "function" ? parent.slow() : parent.slow) : 75;
+    this._retries = parent ? (typeof parent.retries === "function" ? parent.retries() : parent.retries) : 0;
     this.delayed = false;
     this._bail = false;
+  }
+
+  retries(n) {
+    if (arguments.length === 0) return this._retries;
+    this._retries = Number(n);
+    return this;
+  }
+
+  timeout(ms) {
+    if (arguments.length === 0) return this.timeout;
+    this.timeout = Number(ms);
+    return this;
+  }
+
+  slow(ms) {
+    if (arguments.length === 0) return this.slow;
+    this.slow = Number(ms);
+    return this;
   }
 
   bail(val) {
@@ -81,6 +117,24 @@ class Suite {
     let curr = this;
     while (curr.parent) curr = curr.parent;
     return curr;
+  }
+
+  timeout(ms) {
+    if (arguments.length === 0) return this._timeout !== undefined ? this._timeout : 2000;
+    this._timeout = Number(ms);
+    return this;
+  }
+
+  slow(ms) {
+    if (arguments.length === 0) return this._slow !== undefined ? this._slow : 75;
+    this._slow = Number(ms);
+    return this;
+  }
+
+  retries(n) {
+    if (arguments.length === 0) return this._retries !== undefined ? this._retries : 0;
+    this._retries = Number(n);
+    return this;
   }
 
   isPending() {

@@ -1,7 +1,8 @@
 "use strict";
 
 const EventEmitter = require("node:events");
-const { collectBeforeEachHooks, collectAfterEachHooks, runRunnable } = require("./hooks.js");
+const { collectBeforeEachHooks, collectAfterEachHooks } = require("./hooks.js");
+const { Context, PendingError, executeRunnable, cleanError } = require("./context.js");
 
 class Runner extends EventEmitter {
   constructor(options = {}) {
@@ -34,9 +35,6 @@ class Runner extends EventEmitter {
     this._bailed = false;
   }
 
-  /**
-   * Scan tree to collect all .only tests and suites
-   */
   _collectExclusivity(suite, onlyTests = [], onlySuites = []) {
     if (suite._only) {
       onlySuites.push(suite);
@@ -62,9 +60,6 @@ class Runner extends EventEmitter {
     return { onlyTests, onlySuites };
   }
 
-  /**
-   * Determine if a test satisfies .only exclusivity
-   */
   _isTestExclusive(test, onlyTests, onlySuites) {
     if (onlyTests.length > 0) {
       return test._only || onlyTests.includes(test);
@@ -80,9 +75,6 @@ class Runner extends EventEmitter {
     return true;
   }
 
-  /**
-   * Determine if a test matches grep / fgrep / invert filters
-   */
   _matchesFilter(test) {
     const fullTitle = test.fullTitle();
     let matches = true;
@@ -101,9 +93,6 @@ class Runner extends EventEmitter {
     return matches;
   }
 
-  /**
-   * Check if a suite has any runnable or active descendant tests
-   */
   _hasRunnableTests(suite, onlyTests, onlySuites) {
     for (const test of suite.tests) {
       if (this._isTestExclusive(test, onlyTests, onlySuites) && this._matchesFilter(test)) {
@@ -118,9 +107,6 @@ class Runner extends EventEmitter {
     return false;
   }
 
-  /**
-   * Execute the suite tree depth-first.
-   */
   async run(rootSuite) {
     this.stats.start = new Date().toISOString();
     const startTime = Date.now();
@@ -135,7 +121,7 @@ class Runner extends EventEmitter {
       throw err;
     }
 
-    const rootContext = {};
+    const rootContext = new Context(rootSuite);
     await this._runSuite(rootSuite, rootContext, onlyTests, onlySuites, true);
 
     const endTime = Date.now();
@@ -149,33 +135,41 @@ class Runner extends EventEmitter {
   async _runSuite(suite, parentContext, onlyTests, onlySuites, isRoot = false) {
     if (this._bailed) return;
 
-    // Skip entering empty or completely filtered suites (unless root)
     if (!isRoot && !this._hasRunnableTests(suite, onlyTests, onlySuites)) {
       return;
     }
 
-    const suiteContext = Object.create(parentContext);
+    const suiteContext = new Context(suite);
+    Object.assign(suiteContext, parentContext);
+
     if (!isRoot) {
       this.stats.suites++;
       this.emit("suite", suite);
     }
 
     let suiteAborted = false;
+    let suiteSkipped = false;
 
     // 1. Run suite beforeAll hooks
     if (Array.isArray(suite._beforeAll)) {
       for (const hook of suite._beforeAll) {
         if (this._bailed) break;
         this.emit("hook", hook);
+        const hookCtx = new Context(hook);
+        Object.assign(hookCtx, suiteContext);
         try {
-          await runRunnable(hook.fn, suiteContext, hook.timeout || suite.timeout);
+          await executeRunnable(hook.fn, hookCtx, hook.timeout || (typeof suite.timeout === "function" ? suite.timeout() : suite.timeout));
         } catch (err) {
+          if (err instanceof PendingError) {
+            suiteSkipped = true;
+            break;
+          }
           suiteAborted = true;
           this.stats.failures++;
           this.failures.push({
-            title: `"${hook.type}" hook for "${suite.title || "root"}"`,
-            fullTitle: suite.fullTitle() ? `${suite.fullTitle()} "${hook.type}" hook` : `"${hook.type}" hook`,
-            err: { name: err.name || "Error", message: err.message || String(err), stack: err.stack },
+            title: `\"${hook.type}\" hook for \"${suite.title || "root"}\"`,
+            fullTitle: suite.fullTitle() ? `${suite.fullTitle()} \"${hook.type}\" hook` : `\"${hook.type}\" hook`,
+            err: cleanError(err),
           });
           this.emit("fail", hook, err);
           if (this.options.bail || suite._bail) this._bailed = true;
@@ -186,22 +180,32 @@ class Runner extends EventEmitter {
       }
     }
 
-    // 2. If beforeAll hooks succeeded, run tests and child suites
-    if (!suiteAborted && !this._bailed) {
+    // If beforeAll hook called this.skip(), mark all suite tests as pending
+    if (suiteSkipped) {
+      for (const test of suite.tests) {
+        this.stats.tests++;
+        this.stats.pending++;
+        this.pending.push({
+          title: test.title,
+          fullTitle: test.fullTitle(),
+        });
+        this.emit("pending", test);
+      }
+    }
+
+    // 2. If beforeAll hooks succeeded and suite wasn't skipped, run tests and child suites
+    if (!suiteAborted && !suiteSkipped && !this._bailed) {
       for (const test of suite.tests) {
         if (this._bailed || suiteAborted) break;
 
-        // Check exclusivity
         if (!this._isTestExclusive(test, onlyTests, onlySuites)) {
           continue;
         }
 
-        // Check filter
         if (!this._matchesFilter(test)) {
           continue;
         }
 
-        // Check pending
         if (test.isPending()) {
           if (this.options.forbidPending) {
             const err = new Error("Pending test forbidden");
@@ -214,6 +218,7 @@ class Runner extends EventEmitter {
             this.emit("fail", test, err);
             if (this.options.bail || suite._bail) this._bailed = true;
           } else {
+            this.stats.tests++;
             this.stats.pending++;
             this.pending.push({
               title: test.title,
@@ -224,87 +229,182 @@ class Runner extends EventEmitter {
           continue;
         }
 
-        // Active test execution
+        // Active test execution with retry support
         this.stats.tests++;
         this.emit("test", test);
-        const testContext = Object.create(suiteContext);
-        const beforeEachHooks = collectBeforeEachHooks(test);
-        const afterEachHooks = collectAfterEachHooks(test);
 
-        let testFailed = false;
-        let testErr = null;
         const testStartTime = Date.now();
+        let attempt = 0;
+        let testPassed = false;
+        let testSkipped = false;
+        let stepFailed = false;
+        let finalErr = null;
 
-        // Run beforeEach hooks (outer -> inner)
-        for (const hook of beforeEachHooks) {
-          this.emit("hook", hook);
-          try {
-            await runRunnable(hook.fn, testContext, hook.timeout || test.timeout);
-          } catch (err) {
-            testFailed = true;
-            testErr = err;
-            suiteAborted = true; // beforeEach failure aborts suite
-            break;
-          } finally {
-            this.emit("hook end", hook);
-          }
-        }
-
-        // Run test body if beforeEach hooks passed
-        if (!testFailed) {
-          try {
-            await runRunnable(test.fn, testContext, test.timeout);
-          } catch (err) {
-            testFailed = true;
-            testErr = err;
-          }
-        }
-
-        // Run afterEach hooks (inner -> outer) - always run after test or beforeEach
-        for (const hook of afterEachHooks) {
-          this.emit("hook", hook);
-          try {
-            await runRunnable(hook.fn, testContext, hook.timeout || test.timeout);
-          } catch (err) {
-            if (!testFailed) {
-              testFailed = true;
-              testErr = err;
+        while (true) {
+          stepFailed = false;
+          const testContext = Object.create(suiteContext);
+          testContext.test = test;
+          testContext._runnable = test;
+          testContext._timeout = test.timeout !== undefined ? test.timeout : 2000;
+          testContext._slow = test.slow !== undefined ? test.slow : 75;
+          testContext._retries = typeof suiteContext._retries === "number" && suiteContext._retries > 0 
+            ? suiteContext._retries 
+            : (test.retries || 0);
+          testContext._currentRetry = attempt;
+          testContext.timeout = function(ms) {
+            if (!arguments.length) return this._timeout !== null && this._timeout !== undefined ? this._timeout : 2000;
+            this._timeout = Number(ms);
+            if (this.test && typeof this.test.timeout === "function") this.test.timeout(this._timeout);
+            if (typeof this._rescheduleTimer === "function") {
+              this._rescheduleTimer(this._timeout);
             }
-            suiteAborted = true; // afterEach failure aborts suite
-          } finally {
-            this.emit("hook end", hook);
+            return this;
+          };
+          testContext.slow = function(ms) {
+            if (!arguments.length) return this._slow !== null && this._slow !== undefined ? this._slow : 75;
+            this._slow = Number(ms);
+            if (this.test && typeof this.test.slow === "function") this.test.slow(this._slow);
+            return this;
+          };
+          testContext.retries = function(n) {
+            if (!arguments.length) return this._retries !== null && this._retries !== undefined ? this._retries : 0;
+            this._retries = Number(n);
+            if (this.test && typeof this.test.retries === "function") this.test.retries(this._retries);
+            return this;
+          };
+          testContext.currentRetry = function(n) { if (!arguments.length) return this._currentRetry; this._currentRetry = Number(n); return this; };
+          testContext.skip = function() { throw new PendingError("sync skip; aborting execution"); };
+          testContext.onMultipleDone = (multiErr) => {
+            this.stats.failures++;
+            this.failures.push({
+              title: test.title,
+              fullTitle: test.fullTitle(),
+              duration: 0,
+              currentRetry: attempt,
+              err: cleanError(multiErr),
+            });
+            this.emit("fail", test, multiErr);
+            if (this.options.bail || suite._bail) this._bailed = true;
+          };
+
+          const beforeEachHooks = collectBeforeEachHooks(test);
+          const afterEachHooks = collectAfterEachHooks(test);
+
+          let stepErr = null;
+
+          // Run beforeEach hooks (outer -> inner)
+          for (const hook of beforeEachHooks) {
+            this.emit("hook", hook);
+            testContext._runnable = hook;
+            try {
+              await executeRunnable(hook.fn, testContext, hook.timeout || test.timeout);
+            } catch (err) {
+              if (err instanceof PendingError) {
+                testSkipped = true;
+                break;
+              }
+              stepFailed = true;
+              stepErr = err;
+              suiteAborted = true;
+              break;
+            } finally {
+              this.emit("hook end", hook);
+            }
           }
+
+          if (testSkipped) break;
+
+          // Run test body
+          if (!stepFailed) {
+            testContext._runnable = test;
+            try {
+              await executeRunnable(test.fn, testContext, testContext._timeout);
+              testPassed = true;
+            } catch (err) {
+              if (err instanceof PendingError) {
+                testSkipped = true;
+              } else {
+                stepFailed = true;
+                stepErr = err;
+              }
+            }
+          }
+
+          if (testSkipped) break;
+
+          // Run afterEach hooks (inner -> outer)
+          for (const hook of afterEachHooks) {
+            this.emit("hook", hook);
+            testContext._runnable = hook;
+            try {
+              await executeRunnable(hook.fn, testContext, hook.timeout || test.timeout);
+            } catch (err) {
+              if (!stepFailed) {
+                stepFailed = true;
+                stepErr = err;
+              }
+              suiteAborted = true;
+            } finally {
+              this.emit("hook end", hook);
+            }
+          }
+
+          if (testPassed && !stepFailed) {
+            break;
+          }
+
+          finalErr = stepErr;
+          const allowedRetries = typeof testContext._retries === "number" && testContext._retries > 0
+            ? testContext._retries
+            : (typeof test.retries === "number" && test.retries > 0
+              ? test.retries
+              : (typeof suiteContext._retries === "number" && suiteContext._retries > 0 ? suiteContext._retries : 0));
+
+          if (attempt < allowedRetries) {
+            attempt++;
+            this.emit("retry", test);
+            testPassed = false;
+            stepFailed = false;
+            suiteAborted = false;
+            continue;
+          }
+          break;
         }
 
         const duration = Date.now() - testStartTime;
 
-        if (testFailed) {
-          this.stats.failures++;
-          this.failures.push({
+        if (testSkipped) {
+          this.stats.pending++;
+          this.pending.push({
             title: test.title,
             fullTitle: test.fullTitle(),
-            duration,
-            err: {
-              name: testErr ? testErr.name || "Error" : "Error",
-              message: testErr ? testErr.message || String(testErr) : "Unknown error",
-              stack: testErr ? testErr.stack : "",
-            },
           });
-          this.emit("fail", test, testErr);
-          if (this.options.bail || suite._bail) this._bailed = true;
-        } else {
+          this.emit("pending", test);
+        } else if (testPassed && !stepFailed) {
           this.stats.passes++;
           this.passes.push({
             title: test.title,
             fullTitle: test.fullTitle(),
             duration,
+            currentRetry: attempt,
           });
           this.emit("pass", test);
+        } else {
+          this.stats.failures++;
+          this.failures.push({
+            title: test.title,
+            fullTitle: test.fullTitle(),
+            duration,
+            currentRetry: attempt,
+            err: cleanError(finalErr),
+          });
+          this.emit("fail", test, finalErr);
+          if (this.options.bail || suite._bail) this._bailed = true;
         }
+
         this.emit("test end", test);
       }
 
-      // Depth-first traversal into child suites
       if (!this._bailed && !suiteAborted) {
         for (const child of suite.suites) {
           if (this._bailed) break;
@@ -313,18 +413,20 @@ class Runner extends EventEmitter {
       }
     }
 
-    // 3. Run suite afterAll hooks (runs even if beforeAll or tests failed!)
+    // 3. Run suite afterAll hooks
     if (Array.isArray(suite._afterAll)) {
       for (const hook of suite._afterAll) {
         this.emit("hook", hook);
+        const hookCtx = new Context(hook);
+        Object.assign(hookCtx, suiteContext);
         try {
-          await runRunnable(hook.fn, suiteContext, hook.timeout || suite.timeout);
+          await executeRunnable(hook.fn, hookCtx, hook.timeout || (typeof suite.timeout === "function" ? suite.timeout() : suite.timeout));
         } catch (err) {
           this.stats.failures++;
           this.failures.push({
-            title: `"${hook.type}" hook for "${suite.title || "root"}"`,
-            fullTitle: suite.fullTitle() ? `${suite.fullTitle()} "${hook.type}" hook` : `"${hook.type}" hook`,
-            err: { name: err.name || "Error", message: err.message || String(err), stack: err.stack },
+            title: `\"${hook.type}\" hook for \"${suite.title || "root"}\"`,
+            fullTitle: suite.fullTitle() ? `${suite.fullTitle()} \"${hook.type}\" hook` : `\"${hook.type}\" hook`,
+            err: cleanError(err),
           });
           this.emit("fail", hook, err);
           if (this.options.bail || suite._bail) this._bailed = true;

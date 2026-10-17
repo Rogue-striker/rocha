@@ -1,0 +1,26 @@
+{
+  "exitCode": 1,
+  "result": {
+    "stats": {
+      "suites": 1,
+      "tests": 1,
+      "passes": 1,
+      "pending": 0,
+      "failures": 1
+    },
+    "passes": [
+      {
+        "title": "calls done multiple times",
+        "fullTitle": "Double Done Suite calls done multiple times"
+      }
+    ],
+    "pending": [],
+    "failures": [
+      {
+        "title": "calls done multiple times",
+        "fullTitle": "Double Done Suite calls done multiple times",
+        "errName": ""
+      }
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "exitCode": 1,
+  "result": {
+    "stats": {
+      "suites": 1,
+      "tests": 1,
+      "passes": 0,
+      "pending": 0,
+      "failures": 1
+    },
+    "passes": [],
+    "pending": [],
+    "failures": [
+      {
+        "title": "declares done and returns promise",
+        "fullTitle": "Overspecified Suite declares done and returns promise",
+        "errName": ""
+      }
+    ]
+  }
+}
