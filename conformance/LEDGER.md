@@ -1,8 +1,8 @@
 # Conformance Ledger
 
 Runner: **rocha**  
-Pass Rate: **21/21 (100.0%)**  
-Timestamp: 2026-10-17T10:11:08.103Z
+Pass Rate: **23/23 (100.0%)**  
+Timestamp: 2026-10-17T11:07:52.345Z
 
 | Fixture | Status | Exit Code | Passes | Failures | Pending | Notes |
 |---|---|---|---|---|---|---|
@@ -13,6 +13,8 @@ Timestamp: 2026-10-17T10:11:08.103Z
 | `exception-in-timer.fixture.js` | ✅ PASS | 1 | 0 | 1 | 0 | Matches golden |
 | `hooks-nested.fixture.js` | ✅ PASS | 0 | 1 | 0 | 0 | Matches golden |
 | `hooks.fixture.js` | ✅ PASS | 0 | 2 | 0 | 0 | Matches golden |
+| `interface-qunit.fixture.js` | ✅ PASS | 0 | 2 | 0 | 1 | Matches golden |
+| `interface-tdd.fixture.js` | ✅ PASS | 0 | 2 | 0 | 1 | Matches golden |
 | `late-rejection.fixture.js` | ✅ PASS | 0 | 1 | 0 | 0 | Matches golden |
 | `only-nested.fixture.js` | ✅ PASS | 0 | 2 | 0 | 0 | Matches golden |
 | `only.fixture.js` | ✅ PASS | 0 | 1 | 0 | 0 | Matches golden |

@@ -2,6 +2,8 @@
 
 const path = require("node:path");
 const { Suite, Test, Hook, createBddInterface, resetCounters } = require("./interface-bdd.js");
+const { createTddInterface } = require("./interface-tdd.js");
+const { createQunitInterface } = require("./interface-qunit.js");
 const { collectBeforeEachHooks, collectAfterEachHooks, runRunnable, applyMochaHooks } = require("./hooks.js");
 const { Runner } = require("./runner.js");
 const { Context, PendingError, executeRunnable } = require("./context.js");
@@ -32,8 +34,15 @@ class Harness {
   }
 
   install(targetContext = globalThis) {
-    if (this.options.ui === "bdd") {
+    const ui = (this.options.ui || "bdd").toLowerCase();
+    if (ui === "bdd") {
       createBddInterface(targetContext, this.rootSuite, this.options);
+    } else if (ui === "tdd") {
+      createTddInterface(targetContext, this.rootSuite, this.options);
+    } else if (ui === "qunit") {
+      createQunitInterface(targetContext, this.rootSuite, this.options);
+    } else {
+      throw new Error(`Unsupported interface: "${this.options.ui}"`);
     }
 
     if (this.options.delay) {
@@ -90,6 +99,8 @@ module.exports = {
   cleanStack,
   safeStringify,
   createBddInterface,
+  createTddInterface,
+  createQunitInterface,
   buildSuiteTree,
   runFile,
   resetCounters,

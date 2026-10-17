@@ -56,10 +56,17 @@ function runFixture(runner, fixturePath) {
   const relPath = path.relative(rootDir, fixturePath);
   let cmd = '';
 
+  let uiFlag = '';
+  if (fixturePath.includes('tdd')) {
+    uiFlag = ' --ui tdd';
+  } else if (fixturePath.includes('qunit')) {
+    uiFlag = ' --ui qunit';
+  }
+
   if (runner === 'mocha') {
-    cmd = `./node_modules/.bin/mocha --reporter json "${relPath}"`;
+    cmd = `./node_modules/.bin/mocha --reporter json${uiFlag} "${relPath}"`;
   } else if (runner === 'rocha') {
-    cmd = `cargo run -p rocha-cli --quiet -- --reporter json "${relPath}"`;
+    cmd = `cargo run -p rocha-cli --quiet -- --reporter json${uiFlag} "${relPath}"`;
   } else {
     throw new Error(`Unknown runner: ${runner}`);
   }

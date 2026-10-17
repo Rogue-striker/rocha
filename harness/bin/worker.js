@@ -95,6 +95,7 @@ async function executeFile(filePath, options) {
 
   const harness = new Harness({
     file: absPath,
+    ui: options.ui || "bdd",
     timeout: options.timeout_ms !== undefined ? options.timeout_ms : 2000,
     slow: options.slow_ms !== undefined ? options.slow_ms : 75,
     bail: Boolean(options.bail),

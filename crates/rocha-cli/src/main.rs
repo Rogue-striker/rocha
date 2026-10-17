@@ -75,6 +75,9 @@ fn run_harness(args: &CliArgs) -> anyhow::Result<std::process::ExitStatus> {
     if let Some(reporter) = &args.reporter {
         cmd.arg("--reporter").arg(reporter);
     }
+    if let Some(ui) = &args.ui {
+        cmd.arg("--ui").arg(ui);
+    }
     if args.bail {
         cmd.arg("--bail");
     }

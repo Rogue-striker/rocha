@@ -16,6 +16,7 @@ function parseArgs() {
     forbidOnly: false,
     forbidPending: false,
     timeout: 2000,
+    ui: "bdd",
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -34,6 +35,8 @@ function parseArgs() {
       options.forbidOnly = true;
     } else if (arg === "--forbid-pending") {
       options.forbidPending = true;
+    } else if (arg === "-u" || arg === "--ui") {
+      options.ui = args[++i];
     } else if (arg === "-t" || arg === "--timeout") {
       options.timeout = parseInt(args[++i], 10);
     } else if (!arg.startsWith("-")) {

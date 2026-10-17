@@ -1,0 +1,29 @@
+{
+  "exitCode": 0,
+  "result": {
+    "stats": {
+      "suites": 2,
+      "tests": 3,
+      "passes": 2,
+      "pending": 1,
+      "failures": 0
+    },
+    "passes": [
+      {
+        "title": "addition",
+        "fullTitle": "Math QUnit addition"
+      },
+      {
+        "title": "concatenation",
+        "fullTitle": "String QUnit concatenation"
+      }
+    ],
+    "pending": [
+      {
+        "title": "pending test",
+        "fullTitle": "Math QUnit pending test"
+      }
+    ],
+    "failures": []
+  }
+}
