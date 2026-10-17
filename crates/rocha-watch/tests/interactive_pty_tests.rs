@@ -1,9 +1,15 @@
 use rocha_watch::{InteractiveAction, InteractiveController};
+use std::io::Cursor;
+
+#[cfg(unix)]
 use std::fs::File;
-use std::io::{Cursor, Write};
+#[cfg(unix)]
+use std::io::Write;
+#[cfg(unix)]
 use std::os::unix::io::FromRawFd;
 
 #[test]
+#[cfg(unix)]
 fn test_pty_interactive_controls_keystrokes() {
     let mut master: libc::c_int = -1;
     let mut slave: libc::c_int = -1;

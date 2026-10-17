@@ -38,14 +38,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install Node dependencies
-        run: npm ci
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -61,6 +53,14 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Node dependencies
+        run: npm ci --ignore-scripts
 
       - name: Run clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
@@ -84,7 +84,7 @@ jobs:
           node-version: ${{ matrix.node-version }}
 
       - name: Install Node dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Run harness tests
         run: node --test harness/test/**/*.test.js
@@ -96,16 +96,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
       - name: Install Node dependencies
-        run: npm ci
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        run: npm ci --ignore-scripts
 
       - name: Build release Rocha binary
         run: cargo build --release -p rocha-cli --bin rocha

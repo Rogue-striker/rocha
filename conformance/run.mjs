@@ -74,7 +74,15 @@ function runFixture(runner, fixturePath) {
   if (runner === 'mocha') {
     cmd = `./node_modules/.bin/mocha --reporter json${uiFlag}${extraFlags} "${relPath}"`;
   } else if (runner === 'rocha') {
-    cmd = `cargo run -p rocha-cli --quiet -- --reporter json${uiFlag}${extraFlags} "${relPath}"`;
+    const releaseBin = path.join(rootDir, 'target', 'release', 'rocha');
+    const debugBin = path.join(rootDir, 'target', 'debug', 'rocha');
+    if (fs.existsSync(releaseBin)) {
+      cmd = `"${releaseBin}" --reporter json${uiFlag}${extraFlags} "${relPath}"`;
+    } else if (fs.existsSync(debugBin)) {
+      cmd = `"${debugBin}" --reporter json${uiFlag}${extraFlags} "${relPath}"`;
+    } else {
+      cmd = `cargo run -p rocha-cli --quiet -- --reporter json${uiFlag}${extraFlags} "${relPath}"`;
+    }
   } else {
     throw new Error(`Unknown runner: ${runner}`);
   }
@@ -208,6 +216,9 @@ function main() {
   fs.writeFileSync(ledgerPath, md, 'utf8');
   console.log(`Conformance run complete: ${passed}/${total} passed (${passRate}%).`);
   console.log(`Updated ${ledgerPath}`);
+  if (runner !== 'mocha' && passed < total) {
+    process.exit(1);
+  }
 }
 
 main();
