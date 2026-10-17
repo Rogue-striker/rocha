@@ -6,7 +6,7 @@
 | M0-2 | done | agent | b91f868 | CI |
 | M0-3 | done | agent | ea62886 | Tracking files |
 | M0-4 | done | agent | 71f8a84 | Benchmark corpus |
-| M0-5 | todo | | | Baseline profile |
+| M0-5 | done | agent | b738d51 | Baseline profile |
 | C-PROTO | todo | | | Event protocol specification |
 | C-CODEC | todo | | | Codec crate |
 | C-CONFIG | todo | | | Config schema |
