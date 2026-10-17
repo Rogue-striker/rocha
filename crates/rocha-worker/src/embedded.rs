@@ -92,6 +92,13 @@ impl EmbeddedRunner {
         globalThis.assert.equal = globalThis.assert.strictEqual;
         globalThis.assert.ok = globalThis.assert;
 
+        globalThis.require = function(mod) {
+            if (mod === 'assert' || mod === 'node:assert') {
+                return globalThis.assert;
+            }
+            throw new Error('Cannot find module ' + mod);
+        };
+
         globalThis.describe = function(title, fn) {
             globalThis.__rocha_events.push({ type: "suite_start", title: title });
             try {

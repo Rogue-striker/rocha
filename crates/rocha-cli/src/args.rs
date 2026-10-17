@@ -192,6 +192,10 @@ pub struct CliArgs {
     #[arg(long = "isolate", value_name = "MODE")]
     pub isolate: Option<String>,
 
+    /// Execution engine: "node" (default) or "embedded" (experimental in-process JS engine).
+    #[arg(long = "engine", default_value = "node")]
+    pub engine: String,
+
     /// Deterministic test file sharding (e.g. "1/4").
     #[arg(long = "shard", value_name = "SHARD")]
     pub shard: Option<String>,

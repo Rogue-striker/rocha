@@ -11,7 +11,8 @@ fn test_embedded_pure_js_execution_and_timings() {
 
     {
         let mut f = File::create(&test_file).unwrap();
-        f.write_all(br#"
+        f.write_all(
+            br#"
         describe("Pure JS Math Suite", () => {
             it("adds numbers correctly", () => {
                 assert.strictEqual(1 + 1, 2);
@@ -24,7 +25,9 @@ fn test_embedded_pure_js_execution_and_timings() {
             it.skip("is a skipped test", () => {
             });
         });
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
     }
 
     let start = Instant::now();
@@ -55,9 +58,15 @@ fn test_embedded_pure_js_execution_and_timings() {
         other => panic!("Expected FileDone, got {:?}", other),
     }
 
-    assert!(events.iter().any(|e| matches!(e, WorkerMessage::TestPass { id, .. } if id == "adds numbers correctly")));
-    assert!(events.iter().any(|e| matches!(e, WorkerMessage::TestFail { id, .. } if id == "fails when expected")));
-    assert!(events.iter().any(|e| matches!(e, WorkerMessage::TestPending { id } if id == "is a skipped test")));
+    assert!(events.iter().any(
+        |e| matches!(e, WorkerMessage::TestPass { id, .. } if id == "adds numbers correctly")
+    ));
+    assert!(events
+        .iter()
+        .any(|e| matches!(e, WorkerMessage::TestFail { id, .. } if id == "fails when expected")));
+    assert!(events
+        .iter()
+        .any(|e| matches!(e, WorkerMessage::TestPending { id } if id == "is a skipped test")));
 }
 
 #[test]
@@ -67,14 +76,17 @@ fn test_embedded_detects_unsupported_node_modules() {
 
     {
         let mut f = File::create(&test_file).unwrap();
-        f.write_all(br#"
+        f.write_all(
+            br#"
         const fs = require('fs');
         describe("FS Suite", () => {
             it("reads file", () => {
                 fs.readFileSync("foo.txt");
             });
         });
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
     }
 
     let res = EmbeddedRunner::run_file(

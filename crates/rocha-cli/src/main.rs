@@ -38,7 +38,9 @@ use clap::Parser;
 use rocha_config::{resolve_config, ConfigLoader};
 use rocha_discover::{discover_files, DiscoveryOptions};
 use rocha_protocol::RunFileOptions;
-use rocha_report::{create_reporter, detect_color_support, JsReporterBridge, ReporterOptions};
+use rocha_report::{
+    create_reporter, detect_color_support, JsReporterBridge, Reporter, ReporterOptions,
+};
 use rocha_sched::{sharding::ShardSpec, IsolationMode, Scheduler, SchedulerConfig};
 use rocha_transform::{transform_file_and_cache, DiskCache, Options, DEFAULT_MAX_CACHE_BYTES};
 use rocha_worker::WorkerConfig;
@@ -360,7 +362,7 @@ async fn main() -> anyhow::Result<()> {
         jobs,
         isolate,
         worker_config,
-        run_options,
+        run_options: run_options.clone(),
         bail,
         shard,
         root_dir: cwd.clone(),
@@ -371,24 +373,124 @@ async fn main() -> anyhow::Result<()> {
 
     // 7. Execute files through reporter pipeline
     let t_sched = std::time::Instant::now();
-    let run_res = match create_reporter(reporter_name, std::io::stdout(), reporter_opts) {
-        Ok(mut rep) => scheduler.run_files(files.clone(), &mut rep).await,
-        Err(_) => {
-            let mut reporter_options_map = HashMap::new();
-            for opt in &combined_reporter_options {
-                if let Some((k, v)) = opt.split_once('=') {
-                    reporter_options_map.insert(k.to_string(), v.to_string());
+    let is_embedded = args.engine == "embedded" || config.engine == "embedded";
+
+    let mut embedded_files = Vec::new();
+    let mut node_files = Vec::new();
+
+    if is_embedded {
+        for f in &files {
+            let path_str = f.to_string_lossy();
+            if let Ok(content) = std::fs::read_to_string(f) {
+                if let Some(m) =
+                    rocha_worker::embedded::EmbeddedRunner::detect_unsupported_node_modules(
+                        &content,
+                    )
+                {
+                    eprintln!(
+                        "Note: Test file '{}' requires unsupported Node module '{}'; falling back to Node runtime.",
+                        path_str,
+                        m
+                    );
+                    node_files.push(f.clone());
                 } else {
-                    reporter_options_map.insert(opt.clone(), "true".to_string());
+                    embedded_files.push(f.clone());
+                }
+            } else {
+                node_files.push(f.clone());
+            }
+        }
+    } else {
+        node_files = files.clone();
+    }
+
+    let mut embedded_summary = rocha_report::Summary::default();
+    let mut embedded_events = Vec::new();
+
+    for f in &embedded_files {
+        let f_str = f.to_string_lossy();
+        let res = rocha_worker::embedded::EmbeddedRunner::run_file(&f_str, &run_options, |msg| {
+            embedded_events.push(msg.clone());
+        });
+        match res {
+            Ok(rocha_protocol::WorkerMessage::FileDone { counts, .. }) => {
+                embedded_summary.passes += counts.passes as usize;
+                embedded_summary.failures += counts.failures as usize;
+                embedded_summary.pending += counts.pending as usize;
+            }
+            Err(rocha_worker::embedded::EmbeddedEngineError::UnsupportedNodeModule(m)) => {
+                eprintln!(
+                    "Note: Test file '{}' requires unsupported Node module '{}'; falling back to Node runtime.",
+                    f_str, m
+                );
+                node_files.push(f.clone());
+            }
+            Err(_) => {
+                eprintln!(
+                    "Note: Test file '{}' requires Node runtime; falling back to Node runtime.",
+                    f_str
+                );
+                node_files.push(f.clone());
+            }
+            Ok(_) => {}
+        }
+    }
+
+    let run_res: Result<rocha_report::Summary, anyhow::Error> =
+        match create_reporter(reporter_name, std::io::stdout(), reporter_opts) {
+            Ok(mut rep) => {
+                for ev in &embedded_events {
+                    rep.on_event(ev);
+                }
+                if node_files.is_empty() {
+                    embedded_summary.duration_ms = t_sched.elapsed().as_millis() as u64;
+                    let _ = rep.finish(&embedded_summary);
+                    Ok(embedded_summary)
+                } else {
+                    match scheduler.run_files(node_files.clone(), &mut rep).await {
+                        Ok(mut node_summary) => {
+                            node_summary.passes += embedded_summary.passes;
+                            node_summary.failures += embedded_summary.failures;
+                            node_summary.pending += embedded_summary.pending;
+                            Ok(node_summary)
+                        }
+                        Err(e) => Err(anyhow::anyhow!(e)),
+                    }
                 }
             }
-            let mut bridge = JsReporterBridge::new(reporter_name, reporter_options_map, None)
-                .map_err(|e| {
+            Err(_) => {
+                let mut reporter_options_map = HashMap::new();
+                for opt in &combined_reporter_options {
+                    if let Some((k, v)) = opt.split_once('=') {
+                        reporter_options_map.insert(k.to_string(), v.to_string());
+                    } else {
+                        reporter_options_map.insert(opt.clone(), "true".to_string());
+                    }
+                }
+                let mut bridge = JsReporterBridge::new(reporter_name, reporter_options_map, None)
+                    .map_err(|e| {
                     anyhow::anyhow!("Failed to instantiate reporter {}: {}", reporter_name, e)
                 })?;
-            scheduler.run_files(files.clone(), &mut bridge).await
-        }
-    };
+                for ev in &embedded_events {
+                    bridge.on_event(ev);
+                }
+                if node_files.is_empty() {
+                    embedded_summary.duration_ms = t_sched.elapsed().as_millis() as u64;
+                    let _ = bridge.finish(&embedded_summary);
+                    Ok(embedded_summary)
+                } else {
+                    match scheduler.run_files(node_files.clone(), &mut bridge).await {
+                        Ok(mut node_summary) => {
+                            node_summary.passes += embedded_summary.passes;
+                            node_summary.failures += embedded_summary.failures;
+                            node_summary.pending += embedded_summary.pending;
+                            Ok(node_summary)
+                        }
+                        Err(e) => Err(anyhow::anyhow!(e)),
+                    }
+                }
+            }
+        };
 
     let summary = match run_res {
         Ok(s) => s,

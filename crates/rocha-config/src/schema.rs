@@ -122,6 +122,9 @@ pub struct Config {
 
     /// Scan and display tests without executing test bodies.
     pub dry_run: bool,
+
+    /// Execution engine: "node" or "embedded".
+    pub engine: String,
 }
 
 impl Default for Config {
@@ -172,6 +175,7 @@ impl Default for Config {
             inline_diffs: false,
             fail_zero: false,
             dry_run: false,
+            engine: "node".into(),
         }
     }
 }
