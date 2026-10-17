@@ -1,5 +1,7 @@
 //! Worker process management, framed I/O, handshake, and crash detection.
 
+pub mod embedded;
+
 /// Derive effective file timeout based on CLI argument and recorded timing history.
 ///
 /// If `--file-timeout` is given, it is used directly.

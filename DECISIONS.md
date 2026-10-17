@@ -29,3 +29,9 @@
   - Native ESM loaders (`--loader` / `--import`) seamlessly resolve TypeScript fixtures without requiring global compilation steps.
 - **Decision:** Documented real-world corpus methodology in `docs/realworld-report.md`. Rocha serves as a drop-in replacement for stock Mocha CLI in real-world projects.
 - **Status:** Accepted.
+
+### D-004: Activation of Milestone M7 Embedded Engine Gate
+- **Context:** Milestone M7 gate requires: "start only if bench/BASELINE.md and post-D-3 profiling show Node startup plus harness load exceeds 25% of wall time on medium, AND a product decision is logged in DECISIONS.md".
+- **Measurement:** Post-D-3 profiling on `medium` suite (`rocha --profile --isolate=none`) measures total wall time at 158.67ms. Worker spawn (33.68ms / 21.2%) plus harness loading (43.80ms / 27.6%) amounts to 77.48ms (48.8% of wall time), clearly surpassing the 25% threshold.
+- **Decision:** Activate Milestone M7 to conduct feasibility spike (X-1), evaluate Node API shim scope (X-2), and implement `--engine=embedded` opt-in with Node fallback (X-3).
+- **Status:** Accepted.

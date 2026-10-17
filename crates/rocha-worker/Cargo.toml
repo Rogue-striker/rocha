@@ -12,3 +12,8 @@ thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 rocha-protocol = { path = "../rocha-protocol" }
+boa_engine.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile = "3.17"
