@@ -5,6 +5,7 @@ const { Suite, Test, Hook, createBddInterface, resetCounters } = require("./inte
 const { collectBeforeEachHooks, collectAfterEachHooks, runRunnable, applyMochaHooks } = require("./hooks.js");
 const { Runner } = require("./runner.js");
 const { Context, PendingError, executeRunnable } = require("./context.js");
+const { serializeError, cleanStack, safeStringify } = require("./errors.js");
 
 class Harness {
   constructor(options = {}) {
@@ -23,9 +24,9 @@ class Harness {
       forbidPending: Boolean(options.forbidPending),
     };
     this.rootSuite = new Suite("", null, this.options.file);
-    this.rootSuite.timeout = this.options.timeout;
-    this.rootSuite.slow = this.options.slow;
-    this.rootSuite.retries = this.options.retries;
+    this.rootSuite.timeout(this.options.timeout);
+    this.rootSuite.slow(this.options.slow);
+    this.rootSuite.retries(this.options.retries);
     this.rootSuite.delayed = this.options.delay;
     this.isRunCalled = false;
   }
@@ -85,6 +86,9 @@ module.exports = {
   Context,
   PendingError,
   executeRunnable,
+  serializeError,
+  cleanStack,
+  safeStringify,
   createBddInterface,
   buildSuiteTree,
   runFile,
