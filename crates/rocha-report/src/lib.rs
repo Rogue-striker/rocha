@@ -1,7 +1,36 @@
 //! Reporters and event model for Rocha test results.
 
+pub mod base;
+pub mod dot;
+pub mod list;
 pub mod merger;
+pub mod min;
+pub mod spec;
+pub mod tap;
+
+pub use base::ReporterOptions;
+pub use dot::DotReporter;
+pub use list::ListReporter;
 pub use merger::{EventMerger, MergeMode};
+pub use min::MinReporter;
+pub use spec::SpecReporter;
+pub use tap::TapReporter;
+
+/// Create a reporter by name (spec, dot, min, list, tap).
+pub fn create_reporter<'a, W: io::Write + 'a>(
+    name: &str,
+    writer: W,
+    opts: ReporterOptions,
+) -> Result<Box<dyn Reporter + 'a>, String> {
+    match name.to_ascii_lowercase().as_str() {
+        "spec" => Ok(Box::new(SpecReporter::new(writer, opts))),
+        "dot" => Ok(Box::new(DotReporter::new(writer, opts))),
+        "min" => Ok(Box::new(MinReporter::new(writer, opts))),
+        "list" => Ok(Box::new(ListReporter::new(writer, opts))),
+        "tap" => Ok(Box::new(TapReporter::new(writer, opts))),
+        other => Err(format!("Unknown reporter: {}", other)),
+    }
+}
 
 use rocha_protocol::ProtocolError;
 pub use rocha_protocol::{LogStream, TestCounts, WorkerMessage as Event};
