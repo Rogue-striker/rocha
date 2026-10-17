@@ -22,7 +22,7 @@
 | B-1 | done | agent | 257ae10 | Harness core: suite tree builder |
 | B-2 | done | agent | 2100660 | Runner: ordering and hook semantics |
 | B-3 | done | agent | a2b1efa | Async and timeout handling |
-| B-4 | todo | | | Error serialization |
+| B-4 | done | agent | 6ca46b0 | Error serialization |
 | B-5 | todo | | | Event emitter and process lifecycle |
 | B-6 | todo | | | TDD and QUnit interfaces |
 | B-7 | todo | | | Globals leak check and misc flags |
