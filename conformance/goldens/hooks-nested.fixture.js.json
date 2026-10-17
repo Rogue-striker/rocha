@@ -1,0 +1,20 @@
+{
+  "exitCode": 0,
+  "result": {
+    "stats": {
+      "suites": 2,
+      "tests": 1,
+      "passes": 1,
+      "pending": 0,
+      "failures": 0
+    },
+    "passes": [
+      {
+        "title": "verifies nested hook ordering",
+        "fullTitle": "Outer Suite Inner Suite verifies nested hook ordering"
+      }
+    ],
+    "pending": [],
+    "failures": []
+  }
+}

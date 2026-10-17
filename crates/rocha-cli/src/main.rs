@@ -37,6 +37,65 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    if !args.specs.is_empty() {
+        let status = run_harness(&args)?;
+        if !status.success() {
+            std::process::exit(status.code().unwrap_or(1));
+        }
+        return Ok(());
+    }
+
     println!("rocha {}", env!("CARGO_PKG_VERSION"));
     Ok(())
+}
+
+fn run_harness(args: &CliArgs) -> anyhow::Result<std::process::ExitStatus> {
+    let project_root = std::env::var("ROCHA_PROJECT_ROOT")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+            if cwd.join("harness/bin/run.js").exists() {
+                cwd
+            } else if cwd.join("../../harness/bin/run.js").exists() {
+                cwd.join("../..")
+            } else {
+                cwd
+            }
+        });
+
+    let run_js = project_root.join("harness").join("bin").join("run.js");
+    let mut cmd = std::process::Command::new("node");
+    cmd.arg(run_js);
+
+    if let Some(reporter) = &args.reporter {
+        cmd.arg("--reporter").arg(reporter);
+    }
+    if args.bail {
+        cmd.arg("--bail");
+    }
+    if let Some(grep) = &args.grep {
+        cmd.arg("--grep").arg(grep);
+    }
+    if let Some(fgrep) = &args.fgrep {
+        cmd.arg("--fgrep").arg(fgrep);
+    }
+    if args.invert {
+        cmd.arg("--invert");
+    }
+    if args.forbid_only {
+        cmd.arg("--forbid-only");
+    }
+    if args.forbid_pending {
+        cmd.arg("--forbid-pending");
+    }
+    if let Some(timeout) = args.timeout {
+        cmd.arg("--timeout").arg(timeout.to_string());
+    }
+
+    for file in &args.specs {
+        cmd.arg(file);
+    }
+
+    let status = cmd.status()?;
+    Ok(status)
 }

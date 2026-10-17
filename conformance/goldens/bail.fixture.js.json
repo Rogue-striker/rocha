@@ -1,0 +1,26 @@
+{
+  "exitCode": 1,
+  "result": {
+    "stats": {
+      "suites": 1,
+      "tests": 2,
+      "passes": 1,
+      "pending": 0,
+      "failures": 1
+    },
+    "passes": [
+      {
+        "title": "test 1 passes",
+        "fullTitle": "Bail Suite test 1 passes"
+      }
+    ],
+    "pending": [],
+    "failures": [
+      {
+        "title": "test 2 fails",
+        "fullTitle": "Bail Suite test 2 fails",
+        "errName": "AssertionError"
+      }
+    ]
+  }
+}
