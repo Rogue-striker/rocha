@@ -21,11 +21,21 @@ function isTsUrl(url) {
   }
 }
 
-export async function resolve(specifier, context, nextResolve) {
-  // If specifier is a relative path without extension, check for .ts / .tsx
-  if (specifier.startsWith('./') || specifier.startsWith('../')) {
-    if (context.parentURL && context.parentURL.startsWith('file:')) {
-      const parentDir = path.dirname(fileURLToPath(context.parentURL));
+export function resolve(specifier, context, nextResolve) {
+  const parentURL = context.parentURL || pathToFileURL(path.join(process.cwd(), 'entry.js')).href;
+
+  if (specifier.startsWith('./') || specifier.startsWith('../') || specifier.startsWith('/')) {
+    const resolvedUrl = new URL(specifier, parentURL).href;
+    if (isTsUrl(resolvedUrl)) {
+      return {
+        url: resolvedUrl,
+        format: 'module',
+        shortCircuit: true,
+      };
+    }
+
+    if (parentURL.startsWith('file:')) {
+      const parentDir = path.dirname(fileURLToPath(parentURL));
       const targetPath = path.resolve(parentDir, specifier);
       for (const ext of TS_EXTS) {
         if (fs.existsSync(targetPath + ext)) {
@@ -39,14 +49,8 @@ export async function resolve(specifier, context, nextResolve) {
     }
   }
 
-  let resolved;
-  try {
-    resolved = await nextResolve(specifier, context);
-  } catch (err) {
-    throw err;
-  }
-
-  if (isTsUrl(resolved.url)) {
+  const resolved = nextResolve(specifier, context);
+  if (resolved && resolved.url && isTsUrl(resolved.url)) {
     return {
       url: resolved.url,
       format: 'module',
@@ -54,10 +58,13 @@ export async function resolve(specifier, context, nextResolve) {
     };
   }
 
-  return resolved;
+  return {
+    ...resolved,
+    shortCircuit: true,
+  };
 }
 
-export async function load(url, context, nextLoad) {
+export function load(url, context, nextLoad) {
   if (isTsUrl(url)) {
     const filePath = fileURLToPath(url);
     const { code, sourceMap } = getOrTransform(filePath);

@@ -1,4 +1,5 @@
 mod args;
+mod compat;
 
 pub use args::CliArgs;
 use clap::Parser;
@@ -7,6 +8,14 @@ use std::path::PathBuf;
 
 fn main() -> anyhow::Result<()> {
     let args = CliArgs::parse();
+
+    if args.compat_mocha {
+        let status = compat::run_compat_mocha(&args)?;
+        if !status.success() {
+            std::process::exit(status.code().unwrap_or(1));
+        }
+        return Ok(());
+    }
 
     if let Some(file_path_str) = args.transform {
         let file_path = PathBuf::from(file_path_str);

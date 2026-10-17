@@ -25,6 +25,19 @@ for (const ext of TS_EXTENSIONS) {
   require.extensions[ext] = compileTsModule;
 }
 
+// Register ESM hooks so that files imported via import() or ESM loaders in Node are also transformed
+try {
+  const mod = require('node:module');
+  if (typeof mod.registerHooks === 'function') {
+    const hooks = require('./esm-hooks.mjs');
+    mod.registerHooks(hooks);
+  } else if (typeof mod.register === 'function') {
+    mod.register('./esm-hooks.mjs', require('node:url').pathToFileURL(__filename).href);
+  }
+} catch (_) {
+  // ESM registration fallback on older Node environments
+}
+
 module.exports = {
   compileTsModule,
   TS_EXTENSIONS,
