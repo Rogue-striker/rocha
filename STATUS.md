@@ -33,7 +33,7 @@
 | R-5 | done | agent | 1adea61 | TTY/CI behavior |
 | R-6 | done | agent | a5579f0 | JS reporter bridge |
 | D-1 | done | agent | 33b4eba | Worker process manager |
-| D-2 | todo | | | Orchestrator-side hard timeouts |
+| D-2 | done | agent | ea4f734 | Orchestrator-side hard timeouts |
 | D-3 | todo | | | Pool and basic scheduler |
 | D-4 | todo | | | Timing history and longest-first ordering |
 | D-5 | todo | | | Work stealing and suite-level splitting (conditional) |
