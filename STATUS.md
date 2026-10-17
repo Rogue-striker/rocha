@@ -42,7 +42,7 @@
 | D-8 | done | agent | 6509187 | Isolation modes |
 | E-1 | done | agent | 60da3b6 | Main run pipeline |
 | E-2 | done | agent | 0f41e49 | --require, --import, --file, --loader, --node-option |
-| E-3 | todo | | | Config file parity pass |
+| E-3 | done | agent | 2a89ba6 | Config file parity pass |
 | E-4 | todo | | | Error UX |
 | E-5 | todo | | | Conformance push to >= 98% |
 | F-1 | todo | | | File watcher |
