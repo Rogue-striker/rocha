@@ -4,6 +4,7 @@ const path = require("node:path");
 const { Suite, Test, Hook, createBddInterface, resetCounters } = require("./interface-bdd.js");
 const { collectBeforeEachHooks, collectAfterEachHooks, runRunnable, applyMochaHooks } = require("./hooks.js");
 const { Runner } = require("./runner.js");
+const { Context, PendingError, executeRunnable } = require("./context.js");
 
 class Harness {
   constructor(options = {}) {
@@ -81,6 +82,9 @@ module.exports = {
   Test,
   Hook,
   Runner,
+  Context,
+  PendingError,
+  executeRunnable,
   createBddInterface,
   buildSuiteTree,
   runFile,

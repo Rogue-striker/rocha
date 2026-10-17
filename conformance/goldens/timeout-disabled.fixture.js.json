@@ -1,0 +1,20 @@
+{
+  "exitCode": 0,
+  "result": {
+    "stats": {
+      "suites": 1,
+      "tests": 1,
+      "passes": 1,
+      "pending": 0,
+      "failures": 0
+    },
+    "passes": [
+      {
+        "title": "disables timeout with this.timeout(0)",
+        "fullTitle": "Disabled Timeout Suite disables timeout with this.timeout(0)"
+      }
+    ],
+    "pending": [],
+    "failures": []
+  }
+}

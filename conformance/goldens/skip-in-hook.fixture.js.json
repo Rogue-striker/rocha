@@ -1,0 +1,24 @@
+{
+  "exitCode": 0,
+  "result": {
+    "stats": {
+      "suites": 1,
+      "tests": 2,
+      "passes": 0,
+      "pending": 2,
+      "failures": 0
+    },
+    "passes": [],
+    "pending": [
+      {
+        "title": "should be skipped by before hook",
+        "fullTitle": "Skip in Hook Suite should be skipped by before hook"
+      },
+      {
+        "title": "second test skipped by before hook",
+        "fullTitle": "Skip in Hook Suite second test skipped by before hook"
+      }
+    ],
+    "failures": []
+  }
+}

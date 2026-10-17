@@ -1,0 +1,25 @@
+{
+  "exitCode": 0,
+  "result": {
+    "stats": {
+      "suites": 1,
+      "tests": 2,
+      "passes": 1,
+      "pending": 1,
+      "failures": 0
+    },
+    "passes": [
+      {
+        "title": "runs normally after skip",
+        "fullTitle": "This Skip Test Suite runs normally after skip"
+      }
+    ],
+    "pending": [
+      {
+        "title": "skips conditionally with this.skip()",
+        "fullTitle": "This Skip Test Suite skips conditionally with this.skip()"
+      }
+    ],
+    "failures": []
+  }
+}

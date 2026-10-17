@@ -1,0 +1,21 @@
+{
+  "exitCode": 1,
+  "result": {
+    "stats": {
+      "suites": 1,
+      "tests": 1,
+      "passes": 0,
+      "pending": 0,
+      "failures": 1
+    },
+    "passes": [],
+    "pending": [],
+    "failures": [
+      {
+        "title": "times out after custom 50ms",
+        "fullTitle": "Custom Timeout Suite times out after custom 50ms",
+        "errName": ""
+      }
+    ]
+  }
+}
