@@ -1,7 +1,9 @@
 //! File watching and incremental test execution for Rocha.
 
 pub mod import_graph;
+pub mod interactive;
 pub use import_graph::*;
+pub use interactive::*;
 
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher as NotifyWatcher};

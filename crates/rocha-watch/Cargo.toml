@@ -15,3 +15,4 @@ rocha-transform = { path = "../rocha-transform" }
 
 [dev-dependencies]
 tempfile = "3.17"
+libc = "0.2"
