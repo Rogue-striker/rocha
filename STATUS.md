@@ -27,7 +27,7 @@
 | B-6 | done | agent | cd3031a | TDD and QUnit interfaces |
 | B-7 | done | agent | db10fff | Globals leak check and misc flags |
 | R-1 | done | agent | 42a9418 | Event model and reporter trait |
-| R-2 | todo | | | Ordered event merging |
+| R-2 | done | agent | be1c523 | Ordered event merging |
 | R-3 | todo | | | Spec, dot, min, list, tap reporters |
 | R-4 | todo | | | JSON, JSON-stream, XUnit/JUnit, HTML (optional) |
 | R-5 | todo | | | TTY/CI behavior |
