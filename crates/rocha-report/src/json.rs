@@ -136,14 +136,19 @@ impl<W: Write> Reporter for JsonReporter<W> {
 
                 let t = JsonTest {
                     title,
-                    full_title: full,
+                    full_title: full.clone(),
                     file,
                     duration: Some(*duration_ms),
                     current_retry: 0,
-                    speed: Some(speed),
+                    speed: Some(speed.clone()),
                     err: serde_json::json!({}),
                 };
-                self.tests.push(t.clone());
+                if let Some(existing) = self.tests.iter_mut().find(|x| x.full_title == full) {
+                    existing.duration = Some(*duration_ms);
+                    existing.speed = Some(speed);
+                } else {
+                    self.tests.push(t.clone());
+                }
                 self.passes.push(t);
             }
             Event::TestFail {
@@ -159,7 +164,9 @@ impl<W: Write> Reporter for JsonReporter<W> {
                 let full = self.full_title(id);
 
                 let mut err_map = serde_json::Map::new();
-                err_map.insert("name".into(), serde_json::json!(error.name));
+                if error.name != "Error" {
+                    err_map.insert("name".into(), serde_json::json!(error.name));
+                }
                 err_map.insert("message".into(), serde_json::json!(error.message));
                 if let Some(ref stack) = error.stack {
                     err_map.insert("stack".into(), serde_json::json!(stack));
@@ -182,14 +189,18 @@ impl<W: Write> Reporter for JsonReporter<W> {
 
                 let t = JsonTest {
                     title,
-                    full_title: full,
+                    full_title: full.clone(),
                     file,
                     duration: Some(*duration_ms),
                     current_retry: 0,
                     speed: Some(speed_class(*duration_ms, 75).to_string()),
                     err: serde_json::Value::Object(err_map),
                 };
-                self.tests.push(t.clone());
+                if let Some(existing) = self.tests.iter_mut().find(|x| x.full_title == full) {
+                    existing.err = t.err.clone();
+                } else {
+                    self.tests.push(t.clone());
+                }
                 self.failures.push(t);
             }
             Event::TestPending { id } => {
@@ -219,7 +230,7 @@ impl<W: Write> Reporter for JsonReporter<W> {
     fn finish(&mut self, summary: &Summary) -> io::Result<()> {
         let stats = JsonStats {
             suites: self.suites.len(),
-            tests: summary.total(),
+            tests: self.tests.len(),
             passes: summary.passes,
             pending: summary.pending,
             failures: summary.failures,

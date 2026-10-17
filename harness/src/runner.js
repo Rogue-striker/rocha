@@ -45,7 +45,7 @@ class Runner extends EventEmitter {
 
   _getGlobalProps() {
     const props = Object.keys(globalThis);
-    for (const g of ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "setImmediate", "clearImmediate", "Date", "XMLHttpRequest"]) {
+    for (const g of ["describe", "context", "xdescribe", "xcontext", "it", "specify", "xit", "xspecify", "before", "after", "beforeEach", "afterEach", "suite", "test", "setup", "teardown", "suiteSetup", "suiteTeardown", "run", "setTimeout", "clearTimeout", "setInterval", "clearInterval", "setImmediate", "clearImmediate", "Date", "XMLHttpRequest"]) {
       if (!props.includes(g)) props.push(g);
     }
     return props;

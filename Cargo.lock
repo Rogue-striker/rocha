@@ -1347,8 +1347,13 @@ dependencies = [
  "rayon",
  "rocha-config",
  "rocha-discover",
+ "rocha-protocol",
+ "rocha-report",
+ "rocha-sched",
  "rocha-transform",
+ "rocha-worker",
  "serde_json",
+ "tokio",
  "tracing",
 ]
 

@@ -99,6 +99,26 @@ impl Summary {
     }
 }
 
+impl<R: Reporter + ?Sized> Reporter for &mut R {
+    fn on_event(&mut self, ev: &Event) {
+        (**self).on_event(ev);
+    }
+
+    fn finish(&mut self, summary: &Summary) -> io::Result<()> {
+        (**self).finish(summary)
+    }
+}
+
+impl Reporter for Box<dyn Reporter + '_> {
+    fn on_event(&mut self, ev: &Event) {
+        (**self).on_event(ev);
+    }
+
+    fn finish(&mut self, summary: &Summary) -> io::Result<()> {
+        (**self).finish(summary)
+    }
+}
+
 /// Common trait implemented by all Rocha reporters (spec, dot, min, json, etc.).
 pub trait Reporter {
     /// Handle an incoming test event from the worker stream.

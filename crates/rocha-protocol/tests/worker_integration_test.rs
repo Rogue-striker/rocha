@@ -63,6 +63,7 @@ fn test_worker_lifecycle_and_event_sequence() {
             invert_grep: false,
             bail: false,
             retries: 0,
+            ..Default::default()
         },
     };
 

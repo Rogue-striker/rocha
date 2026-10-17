@@ -117,7 +117,7 @@ impl Scheduler {
     }
 
     /// Execute a collection of test files across the worker pool and feed events into `reporter`.
-    pub async fn run_files<R: Reporter + Send + 'static>(
+    pub async fn run_files<R: Reporter>(
         &self,
         files: Vec<PathBuf>,
         reporter: &mut R,

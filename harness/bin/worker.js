@@ -101,8 +101,15 @@ async function executeFile(filePath, options) {
     bail: Boolean(options.bail),
     grep: options.grep || null,
     fgrep: options.fgrep || null,
-    invert: Boolean(options.invert),
+    invert: Boolean(options.invert || options.invert_grep),
     retries: options.retries || 0,
+    forbidOnly: Boolean(options.forbid_only),
+    forbidPending: Boolean(options.forbid_pending),
+    checkLeaks: Boolean(options.check_leaks),
+    globals: options.globals || [],
+    allowUncaught: Boolean(options.allow_uncaught),
+    dryRun: Boolean(options.dry_run),
+    delay: Boolean(options.delay),
   });
 
   const runner = new Runner(harness.options);
@@ -168,6 +175,15 @@ async function executeFile(filePath, options) {
 
   runner.on("pending", (test) => {
     pending++;
+    if (activeTestId !== test.id) {
+      emitter.emit({
+        type: WorkerMessageType.TEST_START,
+        id: test.id,
+        suite: test.suite ? test.suite.id : "",
+        title: test.title,
+        file: test.file || absPath,
+      });
+    }
     emitter.emit({
       type: WorkerMessageType.TEST_PENDING,
       id: test.id,

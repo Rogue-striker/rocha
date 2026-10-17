@@ -13,9 +13,14 @@ path = "src/main.rs"
 clap.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
+tokio = { workspace = true, features = ["full"] }
 rocha-config = { path = "../rocha-config" }
 rocha-transform = { path = "../rocha-transform" }
 rocha-discover = { path = "../rocha-discover" }
+rocha-protocol = { path = "../rocha-protocol" }
+rocha-worker = { path = "../rocha-worker" }
+rocha-sched = { path = "../rocha-sched" }
+rocha-report = { path = "../rocha-report" }
 rayon.workspace = true
 serde_json.workspace = true
 base64-simd = "0.8.0"

@@ -82,6 +82,33 @@ pub struct RunFileOptions {
     /// Number of retries allowed per test.
     #[serde(default)]
     pub retries: u32,
+    /// UI interface style (bdd, tdd, qunit).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ui: Option<String>,
+    /// Substring filter for test titles.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fgrep: Option<String>,
+    /// Fail if test.only or describe.only is present.
+    #[serde(default)]
+    pub forbid_only: bool,
+    /// Fail if pending/skipped tests are present.
+    #[serde(default)]
+    pub forbid_pending: bool,
+    /// Check for global variables leaks.
+    #[serde(default)]
+    pub check_leaks: bool,
+    /// Allowed global variable names when check_leaks is enabled.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub globals: Vec<String>,
+    /// Report tests as passing without executing bodies.
+    #[serde(default)]
+    pub dry_run: bool,
+    /// Disallow uncaught exceptions.
+    #[serde(default)]
+    pub allow_uncaught: bool,
+    /// Wait for global run() callback.
+    #[serde(default)]
+    pub delay: bool,
 }
 
 /// Events emitted by worker processes and sent to the orchestrator.
@@ -254,6 +281,7 @@ mod tests {
                 invert_grep: false,
                 bail: true,
                 retries: 2,
+                ..Default::default()
             },
         };
         let bytes = rmp_serde::to_vec_named(&msg).expect("serialization failed");
