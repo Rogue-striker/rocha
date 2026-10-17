@@ -14,7 +14,7 @@
 | C-CONF | done | agent | 180adf1 | Conformance harness |
 | A-1 | done | agent | e1bbf6d | Config loader |
 | A-2 | done | agent | 2ff7a0d | CLI arg parsing |
-| A-3 | todo | | | File discovery |
+| A-3 | done | agent | f6a1cfd | File discovery |
 | A-4 | todo | | | Transformer (TS/JSX/ESM) |
 | A-5 | todo | | | Disk cache |
 | A-6 | todo | | | Node loader |
