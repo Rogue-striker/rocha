@@ -6,12 +6,12 @@ Profiling results for stock Mocha (v12.0.3, Node v26) running across synthetic b
 
 | Suite | Files | Tests | Mode | Total Wall Time (ms) | Test Exec Time (ms) | Overhead / Startup (ms) | Discovery (est ms) | Module Load & Transpile (est ms) |
 |---|---|---|---|---|---|---|---|---|
-| small | 50 | 500 | serial | 116 | 33 | 83 | 12 | 71 |
-| small | 50 | 500 | parallel | 217 | 133 | 84 | 8 | 76 |
-| medium | 400 | 5000 | serial | 467 | 333 | 134 | 20 | 114 |
-| medium | 400 | 5000 | parallel | 410 | 316 | 94 | 9 | 85 |
-| large-ts | 1500 | 20000 | serial | 1793 | 1277 | 516 | 77 | 439 |
-| large-ts | 1500 | 20000 | parallel | 1153 | 1013 | 140 | 14 | 126 |
+| small | 50 | 500 | serial | 125 | 33 | 92 | 14 | 78 |
+| small | 50 | 500 | parallel | 234 | 144 | 90 | 9 | 81 |
+| medium | 400 | 5000 | serial | 474 | 332 | 142 | 21 | 121 |
+| medium | 400 | 5000 | parallel | 419 | 321 | 98 | 10 | 88 |
+| large-ts | 1500 | 20000 | serial | 1807 | 1282 | 525 | 79 | 446 |
+| large-ts | 1500 | 20000 | parallel | 997 | 841 | 156 | 16 | 140 |
 
 ## Analysis and Top Costs
 
