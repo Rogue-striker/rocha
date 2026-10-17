@@ -5,7 +5,7 @@
 | M0-1 | done | agent | a82dc8b | Workspace skeleton |
 | M0-2 | done | agent | b91f868 | CI |
 | M0-3 | done | agent | ea62886 | Tracking files |
-| M0-4 | todo | | | Benchmark corpus |
+| M0-4 | done | agent | 71f8a84 | Benchmark corpus |
 | M0-5 | todo | | | Baseline profile |
 | C-PROTO | todo | | | Event protocol specification |
 | C-CODEC | todo | | | Codec crate |
