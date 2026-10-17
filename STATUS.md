@@ -13,7 +13,7 @@
 | C-CACHE | done | agent | 54611fc | Transform cache key spec |
 | C-CONF | done | agent | 180adf1 | Conformance harness |
 | A-1 | done | agent | e1bbf6d | Config loader |
-| A-2 | todo | | | CLI arg parsing |
+| A-2 | done | agent | 2ff7a0d | CLI arg parsing |
 | A-3 | todo | | | File discovery |
 | A-4 | todo | | | Transformer (TS/JSX/ESM) |
 | A-5 | todo | | | Disk cache |
