@@ -232,14 +232,17 @@ impl Scheduler {
                             }
                         }
 
-                        while let Some(file) = {
+                        loop {
                             if *worker_abort_rx.borrow() {
-                                None
-                            } else {
-                                let mut guard = q.lock().await;
-                                guard.pop_front()
+                                break;
                             }
-                        } {
+                            let file = {
+                                let mut guard = q.lock().await;
+                                match guard.pop_front() {
+                                    Some(f) => f,
+                                    None => break,
+                                }
+                            };
                             if !worker.is_alive() {
                                 worker = match WorkerProcess::spawn(&config.worker_config).await {
                                     Ok(w) => w,
@@ -285,14 +288,17 @@ impl Scheduler {
                     IsolationMode::File => {
                         let mut active_worker: Option<WorkerProcess> = None;
 
-                        while let Some(file) = {
+                        loop {
                             if *worker_abort_rx.borrow() {
-                                None
-                            } else {
-                                let mut guard = q.lock().await;
-                                guard.pop_front()
+                                break;
                             }
-                        } {
+                            let file = {
+                                let mut guard = q.lock().await;
+                                match guard.pop_front() {
+                                    Some(f) => f,
+                                    None => break,
+                                }
+                            };
                             let mut worker = match active_worker.take() {
                                 Some(w) => w,
                                 None => match WorkerProcess::spawn(&config.worker_config).await {
