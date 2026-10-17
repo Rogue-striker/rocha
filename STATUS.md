@@ -37,7 +37,7 @@
 | D-3 | done | agent | 0eea859 | Pool and basic scheduler |
 | D-4 | done | agent | 8493535 | Timing history and longest-first ordering |
 | D-5 | done | agent | 52b930a | Work stealing and suite-level splitting (conditional) |
-| D-6 | todo | | | Sharding |
+| D-6 | done | agent | 7c891ea | Sharding |
 | D-7 | todo | | | Bail, retries, and abort propagation |
 | D-8 | todo | | | Isolation modes |
 | E-1 | todo | | | Main run pipeline |
