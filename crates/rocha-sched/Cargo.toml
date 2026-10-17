@@ -11,3 +11,5 @@ tokio.workspace = true
 tracing.workspace = true
 rocha-worker = { path = "../rocha-worker" }
 rocha-protocol = { path = "../rocha-protocol" }
+rocha-report = { path = "../rocha-report" }
+rocha-discover = { path = "../rocha-discover" }

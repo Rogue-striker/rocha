@@ -342,6 +342,11 @@ impl WorkerProcess {
         self.stderr_captured.lock().await.clone()
     }
 
+    /// Check whether the worker child process is still running.
+    pub fn is_alive(&mut self) -> bool {
+        matches!(self.child.try_wait(), Ok(None))
+    }
+
     /// Execute a test file with hard orchestrator-side timeouts.
     ///
     /// Hard timeouts:
