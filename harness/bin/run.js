@@ -51,15 +51,20 @@ async function main() {
   }
 
   let totalFailures = 0;
+  let totalPasses = 0;
+  let totalPending = 0;
+  const tStart = Date.now();
   for (const file of options.files) {
     try {
       const result = await runFile(file, options);
+      totalPasses += result.stats.passes;
+      totalFailures += result.stats.failures;
+      totalPending += result.stats.pending;
       if (options.reporter === "json") {
         console.log(JSON.stringify(result, null, 2));
-      } else {
+      } else if (options.reporter !== "min") {
         console.log(`${result.stats.passes} passing, ${result.stats.failures} failing`);
       }
-      totalFailures += result.stats.failures;
       if (options.bail && totalFailures > 0) {
         break;
       }
@@ -79,6 +84,13 @@ async function main() {
     }
   }
 
+  if (options.reporter === "min") {
+    const elapsed = Date.now() - tStart;
+    console.log(`\n  ${totalPasses} passing (${elapsed}ms)`);
+    if (totalFailures > 0) {
+      console.log(`  ${totalFailures} failing`);
+    }
+  }
   process.exit(totalFailures > 0 ? 1 : 0);
 }
 

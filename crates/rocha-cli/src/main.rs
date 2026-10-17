@@ -50,6 +50,7 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn run_harness(args: &CliArgs) -> anyhow::Result<std::process::ExitStatus> {
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let project_root = std::env::var("ROCHA_PROJECT_ROOT")
         .map(PathBuf::from)
         .unwrap_or_else(|_| {
@@ -64,7 +65,11 @@ fn run_harness(args: &CliArgs) -> anyhow::Result<std::process::ExitStatus> {
         });
 
     let run_js = project_root.join("harness").join("bin").join("run.js");
+    let loader_cjs = project_root.join("loader").join("register.cjs");
     let mut cmd = std::process::Command::new("node");
+    if loader_cjs.exists() {
+        cmd.arg("--require").arg(loader_cjs);
+    }
     cmd.arg(run_js);
 
     if let Some(reporter) = &args.reporter {
@@ -92,8 +97,27 @@ fn run_harness(args: &CliArgs) -> anyhow::Result<std::process::ExitStatus> {
         cmd.arg("--timeout").arg(timeout.to_string());
     }
 
-    for file in &args.specs {
-        cmd.arg(file);
+    let disc_opts = rocha_discover::DiscoveryOptions {
+        specs: args.specs.clone(),
+        extensions: vec![
+            "js".into(),
+            "cjs".into(),
+            "mjs".into(),
+            "ts".into(),
+            "tsx".into(),
+            "mts".into(),
+            "cts".into(),
+        ],
+        recursive: true,
+        root_dir: cwd.clone(),
+        ..Default::default()
+    };
+
+    let files = rocha_discover::discover_files(&disc_opts)
+        .unwrap_or_else(|_| args.specs.iter().map(PathBuf::from).collect());
+    for file in files {
+        let rel = file.strip_prefix(&cwd).unwrap_or(&file);
+        cmd.arg(rel);
     }
 
     let status = cmd.status()?;

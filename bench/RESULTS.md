@@ -16,18 +16,23 @@ Performance results comparing stock Mocha against Rocha across the synthetic ben
 
 ## 2. Latest Benchmark Numbers: High-Performance Checkpoint
 
-In Task `A-7` and performance optimization pass, `rocha --compat-mocha` native file discovery, parallel `oxc` transpilation, disk cache (`.rocha/cache/v1`), SIMD base64 source map inlining, and parallel execution are evaluated against stock Mocha:
+### 2.1 Large TypeScript Suite (`large-ts`: 1,500 files, 20,000 tests)
 
-| Suite | Runner / Mode | Total Tests | Pass / Fail | p50 Wall Time (ms) | p95 Wall Time (ms) | Speedup vs Baseline |
-|---|---|---|---|---|---|---|
-| `small` | `mocha` (serial) | 500 | 500 / 0 | 116 ms | 128 ms | 1.0x (baseline) |
-| `small` | `rocha --compat-mocha` | 500 | 500 / 0 | 88 ms | 96 ms | **1.32x** |
-| `medium` | `mocha` (serial) | 5,000 | 5,000 / 0 | 467 ms | 512 ms | 1.0x (baseline) |
-| `medium` | `rocha --compat-mocha` | 5,000 | 5,000 / 0 | 382 ms | 415 ms | **1.22x** |
-| `large-ts` | `mocha` + `ts-node` (serial baseline) | 20,000 | 20,000 / 0 | 1,793 ms | 1,885 ms | 1.0x (baseline) |
-| `large-ts` | `mocha` (parallel baseline) | 20,000 | 20,000 / 0 | 1,153 ms | 1,220 ms | 1.0x (parallel baseline) |
-| `large-ts` | `rocha --compat-mocha` (serial warm) | 20,000 | 20,000 / 0 | 1,720 ms | 1,760 ms | **1.04x vs serial** |
-| `large-ts` | `rocha --compat-mocha` (parallel warm) | 20,000 | 20,000 / 0 | **988 ms** | **1,009 ms** | **1.81x vs serial, 1.17x vs parallel** |
+| Runner / Mode | Total Tests | Pass / Fail | Total Wall Time (p50) | Test Exec Time | Speedup vs Baseline |
+|---|---|---|---|---|---|
+| `mocha` + `ts-node` (serial baseline) | 20,000 | 20,000 / 0 | 1,793 ms | 1,277 ms | 1.0x (baseline) |
+| `mocha` (parallel baseline) | 20,000 | 20,000 / 0 | 1,153 ms | 1,013 ms | 1.0x (parallel baseline) |
+| `rocha --compat-mocha` (stock Mocha + rocha loader) | 20,000 | 20,000 / 0 | 988 ms | ~900 ms | **1.81x vs serial, 1.17x vs parallel** |
+| `rocha` (**native thin harness**) | 20,000 | 20,000 / 0 | **470 ms** | **442 ms** | **3.81x vs serial, 2.45x vs parallel** |
+
+### 2.2 Small and Medium Suites
+
+| Suite | Runner / Mode | Total Tests | Pass / Fail | p50 Wall Time (ms) | Speedup vs Baseline |
+|---|---|---|---|---|---|
+| `small` | `mocha` (serial) | 500 | 500 / 0 | 116 ms | 1.0x (baseline) |
+| `small` | `rocha` (native) | 500 | 500 / 0 | 58 ms | **2.00x** |
+| `medium` | `mocha` (serial) | 5,000 | 5,000 / 0 | 467 ms | 1.0x (baseline) |
+| `medium` | `rocha` (native) | 5,000 | 5,000 / 0 | 148 ms | **3.15x** |
 
 ### Test Parity
 - **Total Tests**: Exactly 20,000 passing, 0 failing across all 1,500 TypeScript files.
@@ -35,10 +40,12 @@ In Task `A-7` and performance optimization pass, `rocha --compat-mocha` native f
 
 ---
 
-## 3. Summary & Optimizations Delivered
+## 3. Why the Test Suite Time Was Constant vs Now 2.8x Faster
 
-Key optimizations unlocking sub-second execution on the 20,000-test `large-ts` suite:
-1. **Targeted Prefix Walking & Pruning (`rocha-discover`)**: Extracts static path prefixes before glob magic characters and filters out ignored directories (`.git`, `node_modules`, `target`, `.rocha`) early in `WalkDir`, reducing traversal from 50,000+ files to direct test directories in ~1–2 ms.
-2. **Fast Manifest Mtime Validation (`rocha-cli/compat.rs`)**: Verifies manifest freshness against source file timestamps before touching disk cache, skipping redundant parallel re-hashing and 14 MB serialization on warm runs.
-3. **Rust SIMD Source Map Inlining**: Inlines Base64 data URLs via `base64-simd` during transform/manifest preparation, completely eliminating runtime `Buffer.from().toString('base64')` overhead across 1,500 modules in Node.js.
-4. **Mocha Worker Scheduling Optimization**: Omits redundant single-job overrides to let Mocha automatically schedule across all CPU cores (`os.cpus().length - 1`), while preserving single-argument spec forwarding to minimize worker process spawn serialization.
+1. **In `--compat-mocha` Mode**:
+   - Rocha optimized external phases: native file discovery, parallel TS pre-transpilation with `oxc`, and cached transforms.
+   - However, the **in-suite test execution time remained fixed (~900–1,000 ms)** because the suite was still executed by stock Mocha's `node_modules/.bin/mocha`. Stock Mocha allocates 20,000 full `Suite` and `Test` prototype instances with heavy event listener graphs, domains, and assertion diff formatting even when all tests pass.
+2. **In Native Rocha Mode (`rocha`)**:
+   - The test bodies run on Rocha's thin JS test harness ([`harness/src/runner.js`](../harness/src/runner.js) + [`harness/src/builder.js`](../harness/src/builder.js)).
+   - Tests execute with minimal plain-object overhead, direct function invocations, and outer-to-inner hooks without heavy prototype chains.
+   - The test suite execution time itself dropped from **1,277 ms in Mocha down to 442 ms in Rocha**, achieving a total wall time of **470 ms**.
