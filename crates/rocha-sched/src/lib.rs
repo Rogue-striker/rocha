@@ -10,7 +10,12 @@ use std::time::{Duration, Instant};
 use thiserror::Error;
 use tokio::sync::{mpsc, Mutex};
 
+pub mod sharding;
 pub mod timings;
+pub use sharding::{
+    calculate_imbalance, calculate_shard_weights, partition_files_into_shards, select_shard_files,
+    ShardError, ShardSpec,
+};
 pub use timings::{
     compute_file_key, order_files_longest_first, simulate_schedule, TimingEntry, TimingStore,
 };
@@ -60,6 +65,8 @@ pub struct SchedulerConfig {
     pub timings_file: Option<PathBuf>,
     /// Root directory used for relative paths in timing history keys.
     pub root_dir: PathBuf,
+    /// Optional sharding specification (e.g. shard 1 of 3).
+    pub shard: Option<ShardSpec>,
 }
 
 impl Default for SchedulerConfig {
@@ -79,6 +86,7 @@ impl Default for SchedulerConfig {
             merge_mode: MergeMode::Ordered,
             timings_file: Some(PathBuf::from(".rocha/timings.json")),
             root_dir: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+            shard: None,
         }
     }
 }
@@ -119,8 +127,22 @@ impl Scheduler {
             .map(TimingStore::load)
             .unwrap_or_default();
 
+        // Filter files by shard if requested
+        let target_files = if let Some(shard) = self.config.shard {
+            select_shard_files(&files, shard, &timing_store, &self.config.root_dir)
+        } else {
+            files
+        };
+
+        if target_files.is_empty() {
+            let summary = Summary::default();
+            reporter.finish(&summary)?;
+            return Ok(summary);
+        }
+
         // Order queue longest-first using timings
-        let ordered_files = order_files_longest_first(&files, &timing_store, &self.config.root_dir);
+        let ordered_files =
+            order_files_longest_first(&target_files, &timing_store, &self.config.root_dir);
 
         let file_strings: Vec<String> = ordered_files
             .into_iter()
