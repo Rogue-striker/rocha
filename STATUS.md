@@ -56,5 +56,5 @@
 | G-5 | done | agent | c167663 | Packaging |
 | G-6 | done | agent | 28e66f7 | Documentation |
 | X-1 | done | agent | 0431269 | Feasibility spike |
-| X-2 | todo | | | Node API shim scope decision |
+| X-2 | done | agent | 3f10225 | Node API shim scope decision |
 | X-3 | todo | | | --engine=embedded opt-in |
