@@ -2,3 +2,5 @@
 
 pub mod codec;
 pub mod events;
+
+pub use events::*;
