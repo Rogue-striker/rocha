@@ -7,8 +7,29 @@ on:
     branches: ["main"]
 
 jobs:
+  lint-and-docs:
+    name: Lint & Documentation Integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check Rust formatting
+        run: cargo fmt --all --check
+
+      - name: Validate task status table
+        run: ./scripts/check-status.sh
+
+      - name: Validate documentation links
+        run: ./scripts/check-links.py
+
   rust:
     name: Rust (${{ matrix.os }})
+    needs: [lint-and-docs]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -17,10 +38,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Node dependencies
+        run: npm ci
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
+          components: clippy
 
       - name: Cache cargo registry and target
         uses: actions/cache@v4
@@ -33,13 +62,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Check formatting
-        run: cargo fmt --all --check
-
       - name: Run clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 
-      - name: Run tests
+      - name: Run workspace tests
         run: cargo test --workspace
 
   harness:
@@ -57,10 +83,35 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
+      - name: Install Node dependencies
+        run: npm ci
+
       - name: Run harness tests
-        run: |
-          if [ -d "harness/test" ] && [ "$(ls -A harness/test 2>/dev/null)" ]; then
-            node --test harness/test/**/*.test.js
-          else
-            echo "No harness tests yet; placeholder pass"
-          fi
+        run: node --test harness/test/**/*.test.js
+
+  conformance-and-perf:
+    name: Conformance & Performance Gate
+    needs: [lint-and-docs]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release Rocha binary
+        run: cargo build --release -p rocha-cli --bin rocha
+
+      - name: Run Mocha conformance suite
+        run: node conformance/run.mjs --runner rocha
+
+      - name: Run performance regression gate
+        run: ./scripts/perf-gate.sh

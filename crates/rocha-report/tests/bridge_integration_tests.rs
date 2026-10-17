@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 #[test]
 fn test_bridge_custom_reporter() {
-    let out_file = PathBuf::from("/tmp/rocha_bridge_custom.txt");
+    let out_file = std::env::temp_dir().join("rocha_bridge_custom.txt");
     if out_file.exists() {
         let _ = fs::remove_file(&out_file);
     }
@@ -74,7 +74,7 @@ fn test_bridge_custom_reporter() {
 
 #[test]
 fn test_bridge_mocha_junit_reporter() {
-    let out_file = PathBuf::from("/tmp/rocha_bridge_junit.xml");
+    let out_file = std::env::temp_dir().join("rocha_bridge_junit.xml");
     if out_file.exists() {
         let _ = fs::remove_file(&out_file);
     }
@@ -96,13 +96,13 @@ fn test_bridge_mocha_junit_reporter() {
         id: "s1".into(),
         parent: None,
         title: "Simple Passing Suite".into(),
-        file: "/Users/striker/Projects/rocha/conformance/fixtures/simple-pass.fixture.js".into(),
+        file: "conformance/fixtures/simple-pass.fixture.js".into(),
     });
     bridge.on_event(&Event::TestStart {
         id: "t1".into(),
         suite: "s1".into(),
         title: "should pass test 1".into(),
-        file: "/Users/striker/Projects/rocha/conformance/fixtures/simple-pass.fixture.js".into(),
+        file: "conformance/fixtures/simple-pass.fixture.js".into(),
     });
     bridge.on_event(&Event::TestPass {
         id: "t1".into(),
@@ -113,7 +113,7 @@ fn test_bridge_mocha_junit_reporter() {
         id: "t2".into(),
         suite: "s1".into(),
         title: "should pass test 2 with string equality".into(),
-        file: "/Users/striker/Projects/rocha/conformance/fixtures/simple-pass.fixture.js".into(),
+        file: "conformance/fixtures/simple-pass.fixture.js".into(),
     });
     bridge.on_event(&Event::TestPass {
         id: "t2".into(),
