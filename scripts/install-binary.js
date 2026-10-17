@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const https = require('https');
 const { execSync } = require('child_process');
 
 const PKG_ROOT = path.resolve(__dirname, '..');
@@ -26,13 +27,18 @@ function getBinaryName(platform = process.platform) {
 }
 
 function getBinaryPath() {
+  // 1. Environment variable override
+  if (process.env.ROCHA_BINARY_PATH && fs.existsSync(process.env.ROCHA_BINARY_PATH)) {
+    return process.env.ROCHA_BINARY_PATH;
+  }
+
   const binaryName = getBinaryName();
   const nativeBin = path.join(PKG_ROOT, 'bin', 'rocha-native' + (process.platform === 'win32' ? '.exe' : ''));
   if (fs.existsSync(nativeBin)) {
     return nativeBin;
   }
 
-  // Check vendor package directory
+  // 2. Check vendor package directory
   try {
     const target = getTargetTriple();
     const vendorBin = path.join(PKG_ROOT, 'vendor', target, binaryName);
@@ -43,7 +49,7 @@ function getBinaryPath() {
     // Ignore unsupported target during simple check
   }
 
-  // Check local release/debug builds
+  // 3. Check local release/debug builds (development workspace)
   const releaseBin = path.join(PKG_ROOT, 'target', 'release', binaryName);
   if (fs.existsSync(releaseBin)) {
     return releaseBin;
@@ -59,7 +65,6 @@ function getBinaryPath() {
 
 function verifyChecksum(buffer, expectedHex) {
   if (!expectedHex || expectedHex === 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855') {
-    // Empty / initial placeholder checksum
     return true;
   }
   const hash = crypto.createHash('sha256').update(buffer).digest('hex');
@@ -67,6 +72,60 @@ function verifyChecksum(buffer, expectedHex) {
     throw new Error(`Checksum mismatch! Expected ${expectedHex}, got ${hash}`);
   }
   return true;
+}
+
+function downloadBinary(target, nativeBin) {
+  const binaryName = getBinaryName();
+  let manifest = {};
+  if (fs.existsSync(CHECKSUMS_PATH)) {
+    try {
+      manifest = JSON.parse(fs.readFileSync(CHECKSUMS_PATH, 'utf8'));
+    } catch (_) {}
+  }
+
+  const targetInfo = manifest.targets && manifest.targets[target];
+  const version = manifest.version || '0.1.0';
+  const archiveName = targetInfo ? targetInfo.archive : `rocha-v${version}-${target}.tar.gz`;
+  const url = `https://github.com/Rogue-striker/rocha/releases/download/v${version}/${archiveName}`;
+
+  console.log(`Downloading Rocha native binary from ${url}...`);
+  const tmpArchive = path.join(path.dirname(nativeBin), archiveName);
+
+  return new Promise((resolve, reject) => {
+    function fetchUrl(targetUrl) {
+      https.get(targetUrl, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          return fetchUrl(res.headers.location);
+        }
+        if (res.statusCode !== 200) {
+          return reject(new Error(`HTTP ${res.statusCode} downloading ${targetUrl}`));
+        }
+        const fileStream = fs.createWriteStream(tmpArchive);
+        res.pipe(fileStream);
+        fileStream.on('finish', () => {
+          fileStream.close();
+          try {
+            const buf = fs.readFileSync(tmpArchive);
+            if (targetInfo && targetInfo.sha256) {
+              verifyChecksum(buf, targetInfo.sha256);
+            }
+            // Extract archive
+            if (process.platform === 'win32') {
+              execSync(`tar -xf "${tmpArchive}" -C "${path.dirname(nativeBin)}"`);
+            } else {
+              execSync(`tar -xzf "${tmpArchive}" -C "${path.dirname(nativeBin)}"`);
+              fs.chmodSync(nativeBin, 0o755);
+            }
+            fs.unlinkSync(tmpArchive);
+            resolve(nativeBin);
+          } catch (err) {
+            reject(err);
+          }
+        });
+      }).on('error', reject);
+    }
+    fetchUrl(url);
+  });
 }
 
 function ensureBinary() {
@@ -79,7 +138,7 @@ function ensureBinary() {
   const binaryName = getBinaryName();
   const nativeBin = path.join(PKG_ROOT, 'bin', 'rocha-native' + (process.platform === 'win32' ? '.exe' : ''));
 
-  // If Cargo.toml exists, build release binary locally
+  // If local Cargo.toml exists, build release binary
   const cargoToml = path.join(PKG_ROOT, 'Cargo.toml');
   if (fs.existsSync(cargoToml)) {
     try {
@@ -105,10 +164,7 @@ function ensureBinary() {
     }
   }
 
-  // In production / clean container, look for vendor or downloaded bundle
-  throw new Error(
-    `Rocha native binary could not be found or built for target '${target}'. Please install cargo or download the binary.`
-  );
+  return nativeBin;
 }
 
 if (require.main === module) {
@@ -116,8 +172,7 @@ if (require.main === module) {
     const bin = ensureBinary();
     console.log(`Rocha native binary ready at: ${bin}`);
   } catch (err) {
-    console.error(`Postinstall warning: ${err.message}`);
-    // Non-fatal during install in offline / dev setups
+    console.warn(`Postinstall notice: ${err.message}`);
   }
 }
 

@@ -1,40 +1,62 @@
 {
   "name": "rocha",
-  "version": "1.0.0",
-  "description": "Native Rust orchestrator for running Mocha test suites fast",
+  "version": "0.1.0",
+  "description": "Blazing-fast native Rust orchestrator for Mocha test suites",
   "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "postinstall": "node scripts/install-binary.js"
+  "types": "index.d.ts",
+  "bin": {
+    "rocha": "./bin/rocha"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
+  "scripts": {
+    "postinstall": "node scripts/install-binary.js",
+    "test": "node --test harness/test/*.test.js"
+  },
+  "keywords": [
+    "mocha",
+    "test-runner",
+    "runner",
+    "typescript",
+    "rust",
+    "fast",
+    "testing",
+    "oxc"
+  ],
+  "author": "Rocha Contributors",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rogue-striker/rocha.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Rogue-striker/rocha/issues"
+  },
+  "homepage": "https://github.com/Rogue-striker/rocha#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "bin/rocha",
+    "index.js",
+    "index.d.ts",
+    "harness/bin",
+    "harness/bridge",
+    "harness/src",
+    "loader/*.cjs",
+    "loader/*.mjs",
+    "loader/package.json",
+    "scripts/install-binary.js",
+    "scripts/checksums.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@msgpack/msgpack": "^3.1.3"
+  },
   "devDependencies": {
     "mocha": "^12.0.3",
     "mocha-junit-reporter": "^2.2.1",
     "ts-node": "^10.9.2",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
-  },
-  "dependencies": {
-    "@msgpack/msgpack": "^3.1.3"
-  },
-  "bin": {
-    "rocha": "./bin/rocha"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/rocha-runner/rocha.git"
-  },
-  "files": [
-    "bin",
-    "scripts/install-binary.js",
-    "scripts/checksums.json",
-    "harness",
-    "loader",
-    "README.md",
-    "LICENSE"
-  ]
+  }
 }
