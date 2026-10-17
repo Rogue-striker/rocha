@@ -1,10 +1,11 @@
 {
   "name": "rocha",
   "version": "1.0.0",
-  "description": "",
+  "description": "Native Rust orchestrator for running Mocha test suites fast",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "postinstall": "node scripts/install-binary.js"
   },
   "keywords": [],
   "author": "",
@@ -19,5 +20,21 @@
   },
   "dependencies": {
     "@msgpack/msgpack": "^3.1.3"
-  }
+  },
+  "bin": {
+    "rocha": "./bin/rocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rocha-runner/rocha.git"
+  },
+  "files": [
+    "bin",
+    "scripts/install-binary.js",
+    "scripts/checksums.json",
+    "harness",
+    "loader",
+    "README.md",
+    "LICENSE"
+  ]
 }

@@ -1,0 +1,27 @@
+#!/usr/bin/env node
+'use strict';
+
+const { spawnSync } = require('child_process');
+const { getBinaryPath, ensureBinary } = require('../scripts/install-binary');
+
+let binPath = getBinaryPath();
+if (!binPath) {
+  try {
+    binPath = ensureBinary();
+  } catch (err) {
+    console.error(`Error resolving rocha binary: ${err.message}`);
+    process.exit(1);
+  }
+}
+
+const result = spawnSync(binPath, process.argv.slice(2), {
+  stdio: 'inherit',
+  env: process.env,
+});
+
+if (result.error) {
+  console.error(`Failed to execute rocha: ${result.error.message}`);
+  process.exit(1);
+}
+
+process.exit(result.status !== null ? result.status : 0);
