@@ -16,7 +16,7 @@
 | A-2 | done | agent | 2ff7a0d | CLI arg parsing |
 | A-3 | done | agent | f6a1cfd | File discovery |
 | A-4 | done | agent | 5a768d3 | Transformer (TS/JSX/ESM) |
-| A-5 | todo | | | Disk cache |
+| A-5 | done | agent | dba1b9e | Disk cache |
 | A-6 | todo | | | Node loader |
 | A-7 | todo | | | Stock-Mocha compatibility mode |
 | B-1 | todo | | | Harness core: suite tree builder |
