@@ -14,3 +14,4 @@ clap.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
 rocha-config = { path = "../rocha-config" }
+rocha-transform = { path = "../rocha-transform" }

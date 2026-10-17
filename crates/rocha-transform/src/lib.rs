@@ -223,6 +223,80 @@ pub fn transform_source(
     })
 }
 
+/// Default canonical options JSON representation for standard configuration.
+pub const DEFAULT_CANONICAL_OPTIONS_JSON: &str =
+    r#"{"commonjs":true,"jsx":"automatic","target":"es2022"}"#;
+
+/// Canonical JSON serialization for Options (sorted keys, whitespace-minimized).
+pub fn canonical_options_json(options: &Options) -> String {
+    let mut parts = Vec::new();
+    parts.push(format!("\"commonjs\":{}", options.commonjs));
+    if let Some(jsx) = &options.jsx {
+        parts.push(format!("\"jsx\":\"{}\"", jsx));
+    }
+    parts.push(format!("\"target\":\"{}\"", options.target));
+    parts.sort();
+    format!("{{{}}}", parts.join(","))
+}
+
+/// Transform a source file on disk, checking disk cache first and writing on miss.
+pub fn transform_file_and_cache(
+    path: &Path,
+    options: &Options,
+    cache: &DiskCache,
+    target_node_version_class: &str,
+) -> Result<CachedEntry, TransformError> {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let source_bytes = fs::read(path)?;
+    let source_str = String::from_utf8_lossy(&source_bytes);
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+
+    let canon_opts = canonical_options_json(options);
+    let key = compute_cache_key(&source_bytes, &ext, &canon_opts, target_node_version_class);
+
+    if let Some(cached) = cache.get(&key) {
+        return Ok(cached);
+    }
+
+    let output = transform_source(path, &source_str, options)?;
+
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+    let mtime = fs::metadata(path)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(now);
+
+    let meta = CacheMeta {
+        version: 1,
+        key: key.clone(),
+        original_file: path.to_string_lossy().to_string(),
+        original_size: source_bytes.len() as u64,
+        original_mtime_ms: mtime,
+        transformed_size: output.code.len() as u64,
+        created_at_ms: now,
+        last_accessed_ms: now,
+        oxc_version: OXC_VERSION.to_string(),
+    };
+
+    cache.put(&key, &output.code, output.source_map.as_deref(), &meta)?;
+
+    Ok(CachedEntry {
+        code: output.code,
+        source_map: output.source_map,
+        meta,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -285,5 +359,28 @@ mod tests {
             loaded.compiler_options.paths.get("@/*"),
             Some(&vec!["src/*".to_string()])
         );
+    }
+
+    #[test]
+    fn test_transform_file_and_cache() {
+        let temp = tempfile::tempdir().unwrap();
+        let cache_dir = temp.path().join("cache");
+        let cache = DiskCache::new(&cache_dir, DEFAULT_MAX_CACHE_BYTES).unwrap();
+
+        let file_path = temp.path().join("example.ts");
+        fs::write(
+            &file_path,
+            "export const add = (a: number, b: number): number => a + b;",
+        )
+        .unwrap();
+
+        let options = Options::default();
+        let entry1 = transform_file_and_cache(&file_path, &options, &cache, "node20").unwrap();
+        assert!(entry1.code.contains("const add = (a, b) => a + b"));
+
+        // Second call should hit the cache
+        let entry2 = transform_file_and_cache(&file_path, &options, &cache, "node20").unwrap();
+        assert_eq!(entry1.meta.key, entry2.meta.key);
+        assert_eq!(entry1.code, entry2.code);
     }
 }

@@ -1,0 +1,11 @@
+{
+  "name": "rocha-loader",
+  "version": "0.1.0",
+  "description": "High-performance cached TS/JSX/ESM loader for Rocha",
+  "main": "index.cjs",
+  "exports": {
+    ".": "./index.cjs",
+    "./register": "./register.cjs",
+    "./esm": "./register.mjs"
+  }
+}

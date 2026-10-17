@@ -1299,6 +1299,7 @@ dependencies = [
  "anyhow",
  "clap",
  "rocha-config",
+ "rocha-transform",
  "tracing",
 ]
 

@@ -191,6 +191,10 @@ pub struct CliArgs {
     /// Deterministic test file sharding (e.g. "1/4").
     #[arg(long = "shard", value_name = "SHARD")]
     pub shard: Option<String>,
+
+    /// Internal / helper: transform a file and write to disk cache.
+    #[arg(long = "transform", value_name = "FILE", hide = true)]
+    pub transform: Option<String>,
 }
 
 impl CliArgs {
