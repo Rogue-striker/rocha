@@ -10,7 +10,7 @@
 | C-PROTO | done | agent | b2a2015 | Event protocol specification |
 | C-CODEC | done | agent | 70947f3 | Codec crate |
 | C-CONFIG | done | agent | 2bb93b9 | Config schema |
-| C-CACHE | todo | | | Transform cache key spec |
+| C-CACHE | done | agent | 54611fc | Transform cache key spec |
 | C-CONF | todo | | | Conformance harness |
 | A-1 | todo | | | Config loader |
 | A-2 | todo | | | CLI arg parsing |
