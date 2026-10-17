@@ -23,7 +23,10 @@ fn run_mocha_lookup(
     let script = format!(
         r#"
 const path = require('node:path');
-const {{ lookupFiles }} = require('mocha/lib/cli/lookup-files.js');
+const lookupFilesModule = require('mocha/lib/cli/lookup-files.js');
+const lookupFiles = typeof lookupFilesModule === 'function'
+    ? lookupFilesModule
+    : lookupFilesModule.lookupFiles;
 const root = {:?};
 const specs = {:?};
 const extensions = {:?};
@@ -34,12 +37,10 @@ const ignore = {:?};
 let all = [];
 for (const spec of specs) {{
     const resolvedSpec = path.join(root, spec);
-    try {{
-        const files = lookupFiles(resolvedSpec, extensions, recursive);
-        if (files) {{
-            all = all.concat(files);
-        }}
-    }} catch (e) {{}}
+    const files = lookupFiles(resolvedSpec, extensions, recursive);
+    if (files) {{
+        all = all.concat(files);
+    }}
 }}
 
 // Deduplicate
