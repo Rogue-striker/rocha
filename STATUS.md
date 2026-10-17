@@ -46,7 +46,7 @@
 | E-4 | done | agent | c41c7a2 | Error UX |
 | E-5 | done | agent | 220080d | Conformance push to >= 98% |
 | F-1 | done | agent | d4821d5 | File watcher |
-| F-2 | todo | | | Import graph and affected tests |
+| F-2 | done | agent | 3e85c22 | Import graph and affected tests |
 | F-3 | todo | | | Interactive controls |
 | F-4 | todo | | | Diagnostics |
 | G-1 | todo | | | Real-world corpus |
