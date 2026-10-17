@@ -51,7 +51,7 @@
 | F-4 | done | agent | 82e5556 | Diagnostics |
 | G-1 | done | agent | 09988a3 | Real-world corpus |
 | G-2 | done | agent | f27b8b0 | Robustness testing |
-| G-3 | todo | | | Cross-platform |
+| G-3 | done | agent | 6cbc063 | Cross-platform |
 | G-4 | todo | | | Performance gate |
 | G-5 | todo | | | Packaging |
 | G-6 | todo | | | Documentation |
