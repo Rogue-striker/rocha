@@ -43,7 +43,7 @@
 | E-1 | done | agent | 60da3b6 | Main run pipeline |
 | E-2 | done | agent | 0f41e49 | --require, --import, --file, --loader, --node-option |
 | E-3 | done | agent | 2a89ba6 | Config file parity pass |
-| E-4 | todo | | | Error UX |
+| E-4 | done | agent | c41c7a2 | Error UX |
 | E-5 | todo | | | Conformance push to >= 98% |
 | F-1 | todo | | | File watcher |
 | F-2 | todo | | | Import graph and affected tests |
