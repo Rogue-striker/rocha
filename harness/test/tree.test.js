@@ -2,7 +2,20 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert');
-const Mocha = require('mocha');
+let Mocha = (() => {
+  try {
+    const m = require("mocha/lib/mocha.cjs");
+    if (typeof m === "function") return m;
+  } catch (_) {}
+  try {
+    const raw = require("mocha");
+    if (typeof raw === "function") return raw;
+    if (raw && typeof raw.Mocha === "function") return raw.Mocha;
+    if (raw && typeof raw.default === "function") return raw.default;
+    return raw;
+  } catch (_) {}
+  return require("mocha");
+})();
 const { buildSuiteTree, resetCounters } = require('../src/index.js');
 
 function buildMochaTree(fn) {
