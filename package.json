@@ -1,6 +1,6 @@
 {
   "name": "rocha",
-  "version": "0.1.0",
+  "version": "2.5.11",
   "description": "Blazing-fast native Rust orchestrator for Mocha test suites",
   "main": "index.js",
   "types": "index.d.ts",
