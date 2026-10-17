@@ -148,3 +148,19 @@ pub struct TestCounts {
   ```
   - Map of 4 top-level keys (`type`, `id`, `duration_ms`, `error`)
   - Submap of 8 keys for `error` detailing assertion mismatch and stack.
+
+---
+
+## 5. Fuzz Testing
+
+The streaming decoder is hardened against arbitrary malformed input and corrupted byte streams.
+
+### Running Cargo Fuzz
+To run the libFuzzer target:
+```bash
+# Requires nightly toolchain with AddressSanitizer
+cargo install cargo-fuzz
+cargo +nightly fuzz run decode -- -max_total_time=60
+```
+
+Continuous integration runs an in-crate proptest fuzz smoke suite (`test_fuzz_smoke_random_bytes`) verifying resilience across arbitrary byte sequences.
