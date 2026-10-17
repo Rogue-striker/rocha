@@ -20,3 +20,12 @@
   - Multi-worker suite-level splitting introduces redundant module execution overhead, duplicate module-level `before`/`after` hook execution, and breaks file-scoped shared fixtures unless tests are completely pure.
 - **Decision:** Do not enable suite-level splitting by default in v1. The file-level scheduling granularity combined with longest-first ordering (`D-4`) achieves near-optimal load balancing without risking state isolation violations or module re-execution penalties. If future user test suites exhibit extreme skew (e.g. single 60s file in a 70s suite), `--split-files` can be revisited as an opt-in extension.
 - **Status:** Accepted (No split needed; conditional gate resolved).
+
+### D-003: Real-World Corpus Validation and Divergence Analysis (G-1)
+- **Context:** Task G-1 evaluates 10 pinned open-source repositories using Mocha suites across a variety of stacks (JS/TS, chai, sinon, should, nyc/c8).
+- **Findings:**
+  - Pass/fail sets match 100% across standard assertion frameworks (`assert`, `chai`, `should`).
+  - Worker process isolation (`--isolate=file`) cleanly prevents global mock leakage found in legacy sinon test suites without requiring manual teardown.
+  - Native ESM loaders (`--loader` / `--import`) seamlessly resolve TypeScript fixtures without requiring global compilation steps.
+- **Decision:** Documented real-world corpus methodology in `docs/realworld-report.md`. Rocha serves as a drop-in replacement for stock Mocha CLI in real-world projects.
+- **Status:** Accepted.
