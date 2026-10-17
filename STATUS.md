@@ -24,7 +24,7 @@
 | B-3 | done | agent | a2b1efa | Async and timeout handling |
 | B-4 | done | agent | 6ca46b0 | Error serialization |
 | B-5 | done | agent | d3d62ab | Event emitter and process lifecycle |
-| B-6 | todo | | | TDD and QUnit interfaces |
+| B-6 | done | agent | cd3031a | TDD and QUnit interfaces |
 | B-7 | todo | | | Globals leak check and misc flags |
 | R-1 | todo | | | Event model and reporter trait |
 | R-2 | todo | | | Ordered event merging |
