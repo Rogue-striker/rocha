@@ -1,13 +1,29 @@
 //! Worker process management, framed I/O, handshake, and crash detection.
 
+/// Derive effective file timeout based on CLI argument and recorded timing history.
+///
+/// If `--file-timeout` is given, it is used directly.
+/// Otherwise, defaults to `max(60s, 10 × recorded)`.
+pub fn derive_file_timeout(
+    recorded_time: Option<Duration>,
+    cli_timeout: Option<Duration>,
+) -> Duration {
+    if let Some(t) = cli_timeout {
+        t
+    } else if let Some(rec) = recorded_time {
+        std::cmp::max(Duration::from_secs(60), rec * 10)
+    } else {
+        Duration::from_secs(60)
+    }
+}
 use rocha_protocol::{
-    encode_frame, CodecError, OrchestratorMessage, RunFileOptions, StreamingDecoder, WorkerMessage,
-    PROTOCOL_VERSION,
+    encode_frame, CodecError, OrchestratorMessage, ProtocolError, RunFileOptions, StreamingDecoder,
+    TestCounts, WorkerMessage, PROTOCOL_VERSION,
 };
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
@@ -324,5 +340,181 @@ impl WorkerProcess {
     /// Read currently captured stderr bytes.
     pub async fn captured_stderr(&self) -> Vec<u8> {
         self.stderr_captured.lock().await.clone()
+    }
+
+    /// Execute a test file with hard orchestrator-side timeouts.
+    ///
+    /// Hard timeouts:
+    /// - `file_timeout`: overall file wall-clock cap.
+    /// - `test_grace`: added to `options.timeout_ms` to determine hard test cap.
+    ///
+    /// If breached, worker is killed immediately, a synthetic failure is emitted for the active test,
+    /// and `FileDone` is returned so execution continues.
+    pub async fn run_file_with_hard_timeout<F>(
+        &mut self,
+        file: &str,
+        options: RunFileOptions,
+        file_timeout: Duration,
+        test_grace: Duration,
+        mut on_event: F,
+    ) -> Result<WorkerMessage, WorkerError>
+    where
+        F: FnMut(&WorkerMessage),
+    {
+        let frame = encode_frame(&OrchestratorMessage::RunFile {
+            file: file.to_string(),
+            options: options.clone(),
+        })?;
+        self.stdin.write_all(&frame).await?;
+        self.stdin.flush().await?;
+
+        let test_base_ms = if options.timeout_ms > 0 {
+            options.timeout_ms
+        } else {
+            2000
+        };
+        let test_hard_cap = Duration::from_millis(test_base_ms) + test_grace;
+
+        let file_start = Instant::now();
+        let mut active_test: Option<(String, Instant)> = None;
+        let mut buf = [0u8; 8192];
+
+        loop {
+            let file_deadline = file_start + file_timeout;
+            let test_deadline = active_test
+                .as_ref()
+                .map(|(_, start)| *start + test_hard_cap);
+            let next_deadline = match test_deadline {
+                Some(td) => std::cmp::min(file_deadline, td),
+                None => file_deadline,
+            };
+
+            let now = Instant::now();
+            let sleep_dur = if next_deadline > now {
+                next_deadline - now
+            } else {
+                Duration::from_millis(0)
+            };
+
+            tokio::select! {
+                _ = tokio::time::sleep(sleep_dur) => {
+                    let is_test_timeout = active_test
+                        .as_ref()
+                        .map(|(_, start)| start.elapsed() >= test_hard_cap)
+                        .unwrap_or(false);
+                    let active_id = active_test.map(|(id, _)| id).unwrap_or_else(|| "hard_timeout".into());
+
+                    let _ = self.child.kill().await;
+                    let _ = self.child.wait().await;
+
+                    let (name, message) = if is_test_timeout {
+                        (
+                            "TimeoutError",
+                            format!(
+                                "Hard timeout of {:?} exceeded for test '{}' (infinite loop or hang)",
+                                test_hard_cap, active_id
+                            ),
+                        )
+                    } else {
+                        (
+                            "TimeoutError",
+                            format!(
+                                "File execution hard timeout of {:?} exceeded for '{}'",
+                                file_timeout, file
+                            ),
+                        )
+                    };
+
+                    let fail_msg = WorkerMessage::TestFail {
+                        id: active_id.clone(),
+                        duration_ms: file_start.elapsed().as_millis() as u64,
+                        error: ProtocolError {
+                            name: name.into(),
+                            message,
+                            stack: None,
+                            code: Some("ERR_HARD_TIMEOUT".into()),
+                            actual: None,
+                            expected: None,
+                            show_diff: false,
+                            operator: None,
+                        },
+                    };
+                    on_event(&fail_msg);
+
+                    let done_msg = WorkerMessage::FileDone {
+                        file: file.to_string(),
+                        counts: TestCounts {
+                            passes: 0,
+                            failures: 1,
+                            pending: 0,
+                            duration_ms: file_start.elapsed().as_millis() as u64,
+                        },
+                    };
+                    on_event(&done_msg);
+                    return Ok(done_msg);
+                }
+                res = self.read_frame_or_data(&mut buf) => {
+                    match res? {
+                        Some(msg) => {
+                            match &msg {
+                                WorkerMessage::TestStart { id, .. } => {
+                                    active_test = Some((id.clone(), Instant::now()));
+                                }
+                                WorkerMessage::TestPass { id, .. }
+                                | WorkerMessage::TestFail { id, .. }
+                                | WorkerMessage::TestPending { id } => {
+                                    if active_test.as_ref().map(|(tid, _)| tid) == Some(id) {
+                                        active_test = None;
+                                    }
+                                }
+                                WorkerMessage::FileDone { .. } => {
+                                    on_event(&msg);
+                                    return Ok(msg);
+                                }
+                                WorkerMessage::Fatal { error } => {
+                                    on_event(&msg);
+                                    return Err(WorkerError::WorkerCrashed {
+                                        file: file.to_string(),
+                                        message: error.message.clone(),
+                                    });
+                                }
+                                _ => {}
+                            }
+                            on_event(&msg);
+                        }
+                        None => {
+                            let stderr_msg =
+                                String::from_utf8_lossy(&self.stderr_captured.lock().await).to_string();
+                            let exit_status = self
+                                .child
+                                .try_wait()?
+                                .map(|s| s.to_string())
+                                .unwrap_or_else(|| "terminated".into());
+                            return Err(WorkerError::WorkerCrashed {
+                                file: file.to_string(),
+                                message: format!("Exit status {}. Stderr: {}", exit_status, stderr_msg),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    async fn read_frame_or_data(
+        &mut self,
+        buf: &mut [u8; 8192],
+    ) -> Result<Option<WorkerMessage>, WorkerError> {
+        if let Some(msg) = self.decoder.poll_next()? {
+            return Ok(Some(msg));
+        }
+
+        let n = self.stdout.read(buf).await?;
+        if n == 0 {
+            return Ok(None);
+        }
+        self.decoder.feed(&buf[..n]);
+
+        Ok(self.decoder.poll_next()?)
     }
 }

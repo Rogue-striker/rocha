@@ -131,6 +131,7 @@ async function executeFile(filePath, options) {
       title: test.title,
       file: test.file || absPath,
     });
+    emitter.flush();
   });
 
   runner.on("pass", (test) => {
