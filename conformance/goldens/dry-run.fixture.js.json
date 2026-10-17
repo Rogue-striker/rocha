@@ -1,0 +1,24 @@
+{
+  "exitCode": 0,
+  "result": {
+    "stats": {
+      "suites": 1,
+      "tests": 2,
+      "passes": 2,
+      "pending": 0,
+      "failures": 0
+    },
+    "passes": [
+      {
+        "title": "test 1",
+        "fullTitle": "Dry Run Fixture test 1"
+      },
+      {
+        "title": "test 2",
+        "fullTitle": "Dry Run Fixture test 2"
+      }
+    ],
+    "pending": [],
+    "failures": []
+  }
+}

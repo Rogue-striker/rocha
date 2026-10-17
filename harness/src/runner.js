@@ -16,7 +16,15 @@ class Runner extends EventEmitter {
       forbidPending: Boolean(options.forbidPending),
       timeout: options.timeout !== undefined ? options.timeout : 2000,
       slow: options.slow !== undefined ? options.slow : 75,
+      checkLeaks: Boolean(options.checkLeaks),
+      globals: Array.isArray(options.globals) ? options.globals : (options.globals ? [options.globals] : []),
+      allowUncaught: Boolean(options.allowUncaught),
+      dryRun: Boolean(options.dryRun),
+      failZero: Boolean(options.failZero),
     };
+
+    this._globals = (this.options.globals || []).concat(this._getGlobalProps());
+    this._prevGlobalsLength = this._globals.length;
 
     this.stats = {
       suites: 0,
@@ -33,6 +41,47 @@ class Runner extends EventEmitter {
     this.pending = [];
     this.failures = [];
     this._bailed = false;
+  }
+
+  _getGlobalProps() {
+    const props = Object.keys(globalThis);
+    for (const g of ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "setImmediate", "clearImmediate", "Date", "XMLHttpRequest"]) {
+      if (!props.includes(g)) props.push(g);
+    }
+    return props;
+  }
+
+  _checkGlobals(test) {
+    if (!this.options.checkLeaks) return;
+    const ok = this._globals.concat(test && test._allowedGlobals ? test._allowedGlobals : []);
+    const current = this._getGlobalProps();
+    if (this._prevGlobalsLength === current.length) return;
+    this._prevGlobalsLength = current.length;
+
+    const leaks = current.filter((key) => {
+      if (/^\d+/.test(key) || /^mocha-/.test(key)) return false;
+      const matched = ok.some((allowed) => {
+        if (allowed.includes("*")) {
+          return key.startsWith(allowed.split("*")[0]);
+        }
+        return key === allowed;
+      });
+      return !matched;
+    });
+
+    this._globals = this._globals.concat(leaks);
+    if (leaks.length > 0) {
+      const msg = `global leak(s) detected: ${leaks.map((e) => `'${e}'`).join(", ")}`;
+      const err = new Error(msg);
+      this.stats.failures++;
+      this.failures.push({
+        title: test.title,
+        fullTitle: test.fullTitle(),
+        err: cleanError(err),
+      });
+      this.emit("fail", test, err);
+      if (this.options.bail) this._bailed = true;
+    }
   }
 
   _collectExclusivity(suite, onlyTests = [], onlySuites = []) {
@@ -124,6 +173,15 @@ class Runner extends EventEmitter {
     const rootContext = new Context(rootSuite);
     await this._runSuite(rootSuite, rootContext, onlyTests, onlySuites, true);
 
+    if (this.options.failZero && this.stats.tests === 0) {
+      this.stats.failures = 1;
+      this.failures.push({
+        title: "failZero",
+        fullTitle: "No tests found",
+        err: { name: "Error", message: "No tests found" },
+      });
+    }
+
     const endTime = Date.now();
     this.stats.end = new Date().toISOString();
     this.stats.duration = endTime - startTime;
@@ -155,8 +213,10 @@ class Runner extends EventEmitter {
       for (const hook of suite._beforeAll) {
         if (this._bailed) break;
         this.emit("hook", hook);
+        if (this.options.dryRun) break;
         const hookCtx = new Context(hook);
         Object.assign(hookCtx, suiteContext);
+        hookCtx.allowUncaught = this.options.allowUncaught;
         try {
           await executeRunnable(hook.fn, hookCtx, hook.timeout || (typeof suite.timeout === "function" ? suite.timeout() : suite.timeout));
         } catch (err) {
@@ -229,6 +289,21 @@ class Runner extends EventEmitter {
           continue;
         }
 
+        if (this.options.dryRun) {
+          this.stats.tests++;
+          this.stats.passes++;
+          this.passes.push({
+            title: test.title,
+            fullTitle: test.fullTitle(),
+            duration: 0,
+            currentRetry: 0,
+          });
+          this.emit("test", test);
+          this.emit("pass", test);
+          this.emit("test end", test);
+          continue;
+        }
+
         // Active test execution with retry support
         this.stats.tests++;
         this.emit("test", test);
@@ -245,6 +320,7 @@ class Runner extends EventEmitter {
           const testContext = Object.create(suiteContext);
           testContext.test = test;
           testContext._runnable = test;
+          testContext.allowUncaught = this.options.allowUncaught;
           testContext._timeout = test.timeout !== undefined ? test.timeout : 2000;
           testContext._slow = test.slow !== undefined ? test.slow : 75;
           testContext._retries = typeof suiteContext._retries === "number" && suiteContext._retries > 0 
@@ -350,6 +426,7 @@ class Runner extends EventEmitter {
           }
 
           if (testPassed && !stepFailed) {
+            this._checkGlobals(test);
             break;
           }
 

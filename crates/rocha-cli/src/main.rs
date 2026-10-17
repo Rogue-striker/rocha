@@ -99,6 +99,21 @@ fn run_harness(args: &CliArgs) -> anyhow::Result<std::process::ExitStatus> {
     if let Some(timeout) = args.timeout {
         cmd.arg("--timeout").arg(timeout.to_string());
     }
+    if args.check_leaks {
+        cmd.arg("--check-leaks");
+    }
+    for g in &args.global {
+        cmd.arg("--global").arg(g);
+    }
+    if args.allow_uncaught {
+        cmd.arg("--allow-uncaught");
+    }
+    if args.dry_run {
+        cmd.arg("--dry-run");
+    }
+    if args.fail_zero {
+        cmd.arg("--fail-zero");
+    }
 
     let disc_opts = rocha_discover::DiscoveryOptions {
         specs: args.specs.clone(),

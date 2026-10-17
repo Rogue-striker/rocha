@@ -129,8 +129,10 @@ function executeRunnable(fn, ctx, defaultTimeout = 2000) {
       onUncaught(err);
     };
 
-    process.prependListener("uncaughtException", onUncaught);
-    process.prependListener("unhandledRejection", onUnhandledRejection);
+    if (!ctx || !ctx.allowUncaught) {
+      process.prependListener("uncaughtException", onUncaught);
+      process.prependListener("unhandledRejection", onUnhandledRejection);
+    }
 
     const done = (err) => {
       doneCallCount++;

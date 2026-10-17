@@ -63,10 +63,18 @@ function runFixture(runner, fixturePath) {
     uiFlag = ' --ui qunit';
   }
 
+  let extraFlags = '';
+  if (fixturePath.includes('check-leaks')) {
+    extraFlags += ' --check-leaks';
+  }
+  if (fixturePath.includes('dry-run')) {
+    extraFlags += ' --dry-run';
+  }
+
   if (runner === 'mocha') {
-    cmd = `./node_modules/.bin/mocha --reporter json${uiFlag} "${relPath}"`;
+    cmd = `./node_modules/.bin/mocha --reporter json${uiFlag}${extraFlags} "${relPath}"`;
   } else if (runner === 'rocha') {
-    cmd = `cargo run -p rocha-cli --quiet -- --reporter json${uiFlag} "${relPath}"`;
+    cmd = `cargo run -p rocha-cli --quiet -- --reporter json${uiFlag}${extraFlags} "${relPath}"`;
   } else {
     throw new Error(`Unknown runner: ${runner}`);
   }

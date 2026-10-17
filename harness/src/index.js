@@ -24,6 +24,11 @@ class Harness {
       bail: options.bail || false,
       forbidOnly: Boolean(options.forbidOnly),
       forbidPending: Boolean(options.forbidPending),
+      checkLeaks: Boolean(options.checkLeaks),
+      globals: options.globals || options.global || [],
+      allowUncaught: Boolean(options.allowUncaught),
+      dryRun: Boolean(options.dryRun),
+      failZero: Boolean(options.failZero),
     };
     this.rootSuite = new Suite("", null, this.options.file);
     this.rootSuite.timeout(this.options.timeout);

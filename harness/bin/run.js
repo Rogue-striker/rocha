@@ -17,6 +17,11 @@ function parseArgs() {
     forbidPending: false,
     timeout: 2000,
     ui: "bdd",
+    checkLeaks: false,
+    globals: [],
+    allowUncaught: false,
+    dryRun: false,
+    failZero: false,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -39,6 +44,16 @@ function parseArgs() {
       options.ui = args[++i];
     } else if (arg === "-t" || arg === "--timeout") {
       options.timeout = parseInt(args[++i], 10);
+    } else if (arg === "--check-leaks") {
+      options.checkLeaks = true;
+    } else if (arg === "--global" && args[i + 1]) {
+      options.globals.push(args[++i]);
+    } else if (arg === "--allow-uncaught") {
+      options.allowUncaught = true;
+    } else if (arg === "--dry-run") {
+      options.dryRun = true;
+    } else if (arg === "--fail-zero") {
+      options.failZero = true;
     } else if (!arg.startsWith("-")) {
       options.files.push(arg);
     }
@@ -92,6 +107,12 @@ async function main() {
     console.log(`\n  ${totalPasses} passing (${elapsed}ms)`);
     if (totalFailures > 0) {
       console.log(`  ${totalFailures} failing`);
+    }
+  }
+  if (options.failZero && totalPasses === 0 && totalFailures === 0 && totalPending === 0) {
+    totalFailures = 1;
+    if (options.reporter !== "json") {
+      console.error("No tests found");
     }
   }
   process.exit(totalFailures > 0 ? 1 : 0);
