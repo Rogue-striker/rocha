@@ -45,7 +45,7 @@
 | E-3 | done | agent | 2a89ba6 | Config file parity pass |
 | E-4 | done | agent | c41c7a2 | Error UX |
 | E-5 | done | agent | 220080d | Conformance push to >= 98% |
-| F-1 | todo | | | File watcher |
+| F-1 | done | agent | d4821d5 | File watcher |
 | F-2 | todo | | | Import graph and affected tests |
 | F-3 | todo | | | Interactive controls |
 | F-4 | todo | | | Diagnostics |
