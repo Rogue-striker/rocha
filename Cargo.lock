@@ -1402,10 +1402,13 @@ dependencies = [
 name = "rocha-sched"
 version = "0.1.0"
 dependencies = [
+ "blake3",
  "rocha-discover",
  "rocha-protocol",
  "rocha-report",
  "rocha-worker",
+ "serde",
+ "serde_json",
  "thiserror",
  "tokio",
  "tracing",

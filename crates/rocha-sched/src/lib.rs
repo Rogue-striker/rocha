@@ -10,6 +10,11 @@ use std::time::{Duration, Instant};
 use thiserror::Error;
 use tokio::sync::{mpsc, Mutex};
 
+pub mod timings;
+pub use timings::{
+    compute_file_key, order_files_longest_first, simulate_schedule, TimingEntry, TimingStore,
+};
+
 /// Isolation mode between test file executions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum IsolationMode {
@@ -51,6 +56,10 @@ pub struct SchedulerConfig {
     pub test_grace: Duration,
     /// Event release order to reporters (ordered vs streaming).
     pub merge_mode: MergeMode,
+    /// Path to timing history JSON file (e.g. .rocha/timings.json).
+    pub timings_file: Option<PathBuf>,
+    /// Root directory used for relative paths in timing history keys.
+    pub root_dir: PathBuf,
 }
 
 impl Default for SchedulerConfig {
@@ -68,6 +77,8 @@ impl Default for SchedulerConfig {
             file_timeout: derive_file_timeout(None, None),
             test_grace: Duration::from_secs(5),
             merge_mode: MergeMode::Ordered,
+            timings_file: Some(PathBuf::from(".rocha/timings.json")),
+            root_dir: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
         }
     }
 }
@@ -94,16 +105,27 @@ impl Scheduler {
         files: Vec<PathBuf>,
         reporter: &mut R,
     ) -> Result<Summary, SchedulerError> {
-        let file_strings: Vec<String> = files
-            .into_iter()
-            .map(|p| p.to_string_lossy().to_string())
-            .collect();
-
-        if file_strings.is_empty() {
+        if files.is_empty() {
             let summary = Summary::default();
             reporter.finish(&summary)?;
             return Ok(summary);
         }
+
+        // Load historical timings if configured
+        let mut timing_store = self
+            .config
+            .timings_file
+            .as_ref()
+            .map(TimingStore::load)
+            .unwrap_or_default();
+
+        // Order queue longest-first using timings
+        let ordered_files = order_files_longest_first(&files, &timing_store, &self.config.root_dir);
+
+        let file_strings: Vec<String> = ordered_files
+            .into_iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect();
 
         let start_time = Instant::now();
         let (tx, mut rx) = mpsc::unbounded_channel::<(String, WorkerMessage)>();
@@ -222,10 +244,24 @@ impl Scheduler {
         drop(tx);
 
         // Process events through EventMerger into reporter
-        let mut merger = EventMerger::new(file_strings, self.config.merge_mode);
+        let mut merger = EventMerger::new(file_strings.clone(), self.config.merge_mode);
+        let mut file_durations: Vec<(String, f64)> = Vec::new();
 
         while let Some((file, event)) = rx.recv().await {
+            if let WorkerMessage::FileDone { counts, .. } = &event {
+                file_durations.push((file.clone(), counts.duration_ms as f64));
+            }
             merger.push(&file, event, reporter);
+        }
+
+        // Update timing history
+        if let Some(ref timings_path) = self.config.timings_file {
+            for (f, dur) in file_durations {
+                let p = PathBuf::from(&f);
+                let key = compute_file_key(&self.config.root_dir, &p);
+                timing_store.record_duration(&key, dur);
+            }
+            let _ = timing_store.save(timings_path);
         }
 
         // Wait for all worker tasks to finish
