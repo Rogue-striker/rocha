@@ -11,7 +11,7 @@
 | C-CODEC | done | agent | 70947f3 | Codec crate |
 | C-CONFIG | done | agent | 2bb93b9 | Config schema |
 | C-CACHE | done | agent | 54611fc | Transform cache key spec |
-| C-CONF | todo | | | Conformance harness |
+| C-CONF | done | agent | 180adf1 | Conformance harness |
 | A-1 | todo | | | Config loader |
 | A-2 | todo | | | CLI arg parsing |
 | A-3 | todo | | | File discovery |
