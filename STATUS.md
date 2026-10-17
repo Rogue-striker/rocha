@@ -49,7 +49,7 @@
 | F-2 | done | agent | 3e85c22 | Import graph and affected tests |
 | F-3 | done | agent | f03d10e | Interactive controls |
 | F-4 | done | agent | 82e5556 | Diagnostics |
-| G-1 | todo | | | Real-world corpus |
+| G-1 | done | agent | 09988a3 | Real-world corpus |
 | G-2 | todo | | | Robustness testing |
 | G-3 | todo | | | Cross-platform |
 | G-4 | todo | | | Performance gate |
