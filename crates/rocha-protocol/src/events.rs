@@ -12,7 +12,7 @@ pub const MAX_FRAME_SIZE: usize = 8 * 1024 * 1024;
 pub const MAX_ERROR_STRING_LEN: usize = 1024 * 1024;
 
 /// Structured error payload serialized across the wire protocol.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProtocolError {
     /// Error class / constructor name (e.g. "AssertionError", "TypeError").
     pub name: String,
