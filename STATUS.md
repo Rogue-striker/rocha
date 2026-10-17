@@ -9,7 +9,7 @@
 | M0-5 | done | agent | b738d51 | Baseline profile |
 | C-PROTO | done | agent | b2a2015 | Event protocol specification |
 | C-CODEC | done | agent | 70947f3 | Codec crate |
-| C-CONFIG | todo | | | Config schema |
+| C-CONFIG | done | agent | 2bb93b9 | Config schema |
 | C-CACHE | todo | | | Transform cache key spec |
 | C-CONF | todo | | | Conformance harness |
 | A-1 | todo | | | Config loader |
