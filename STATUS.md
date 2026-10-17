@@ -41,7 +41,7 @@
 | D-7 | done | agent | 2b20b86 | Bail, retries, and abort propagation |
 | D-8 | done | agent | 6509187 | Isolation modes |
 | E-1 | done | agent | 60da3b6 | Main run pipeline |
-| E-2 | todo | | | --require, --import, --file, --loader, --node-option |
+| E-2 | done | agent | 0f41e49 | --require, --import, --file, --loader, --node-option |
 | E-3 | todo | | | Config file parity pass |
 | E-4 | todo | | | Error UX |
 | E-5 | todo | | | Conformance push to >= 98% |
