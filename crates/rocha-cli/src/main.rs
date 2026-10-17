@@ -138,13 +138,39 @@ async fn main() -> anyhow::Result<()> {
     } else if args.color {
         Some(true)
     } else {
-        None
+        config.color
     };
-    let reporter_opts = ReporterOptions {
+
+    let show_diff = if args.no_diff {
+        false
+    } else if args.diff {
+        true
+    } else {
+        config.diff
+    };
+
+    let mut reporter_opts = ReporterOptions {
         use_colors: detect_color_support(cli_color),
         inline_diffs: args.inline_diffs || config.inline_diffs,
+        max_diff_size: if show_diff { 8192 } else { 0 },
         ..Default::default()
     };
+
+    let mut combined_reporter_options: Vec<String> = config.reporter_option.clone();
+    for opt in &args.reporter_option {
+        if !combined_reporter_options.contains(opt) {
+            combined_reporter_options.push(opt.clone());
+        }
+    }
+    for opt in &combined_reporter_options {
+        if let Some((k, v)) = opt.split_once('=') {
+            if k == "maxDiffSize" {
+                if let Ok(sz) = v.parse::<usize>() {
+                    reporter_opts.max_diff_size = sz;
+                }
+            }
+        }
+    }
 
     // 5. Worker configuration
     let mut node_options = config.node_option.clone();
@@ -262,8 +288,16 @@ async fn main() -> anyhow::Result<()> {
     let summary = match create_reporter(reporter_name, std::io::stdout(), reporter_opts) {
         Ok(mut rep) => scheduler.run_files(files, &mut rep).await?,
         Err(_) => {
-            let mut bridge =
-                JsReporterBridge::new(reporter_name, HashMap::new(), None).map_err(|e| {
+            let mut reporter_options_map = HashMap::new();
+            for opt in &combined_reporter_options {
+                if let Some((k, v)) = opt.split_once('=') {
+                    reporter_options_map.insert(k.to_string(), v.to_string());
+                } else {
+                    reporter_options_map.insert(opt.clone(), "true".to_string());
+                }
+            }
+            let mut bridge = JsReporterBridge::new(reporter_name, reporter_options_map, None)
+                .map_err(|e| {
                     anyhow::anyhow!("Failed to instantiate reporter {}: {}", reporter_name, e)
                 })?;
             scheduler.run_files(files, &mut bridge).await?
