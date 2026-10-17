@@ -29,7 +29,6 @@ jobs:
 
   rust:
     name: Rust (${{ matrix.os }})
-    needs: [lint-and-docs]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -87,11 +86,10 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Run harness tests
-        run: node --test harness/test/**/*.test.js
+        run: npm test
 
   conformance-and-perf:
     name: Conformance & Performance Gate
-    needs: [lint-and-docs]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -11,6 +11,22 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
+#[cfg(unix)]
+fn success_exit_status() -> std::process::ExitStatus {
+    use std::os::unix::process::ExitStatusExt;
+    std::process::ExitStatus::from_raw(0)
+}
+
+#[cfg(windows)]
+fn success_exit_status() -> std::process::ExitStatus {
+    use std::os::windows::process::ExitStatusExt;
+    std::process::ExitStatus::from_raw(0)
+}
+
+#[cfg(not(any(unix, windows)))]
+fn success_exit_status() -> std::process::ExitStatus {
+    Command::new("true").status().unwrap()
+}
 
 /// Execute test suite by launching stock Mocha with native discovery and rocha-loader.
 pub fn run_compat_mocha(args: &crate::CliArgs) -> anyhow::Result<ExitStatus> {
@@ -58,7 +74,7 @@ pub fn run_compat_mocha(args: &crate::CliArgs) -> anyhow::Result<ExitStatus> {
 
     if discovered_files.is_empty() {
         eprintln!("No test files found matching specs: {:?}", specs);
-        return Command::new("true").status().map_err(Into::into);
+        return Ok(success_exit_status());
     }
 
     // 2. Parallel pre-caching of TypeScript/JSX files using rayon + oxc
@@ -180,8 +196,21 @@ pub fn run_compat_mocha(args: &crate::CliArgs) -> anyhow::Result<ExitStatus> {
         }
     }
 
-    // 3. Locate Mocha binary
-    let mocha_bin = find_mocha_binary(&cwd);
+    // 3. Locate Mocha binary or entrypoint
+    let mocha_js = cwd
+        .join("node_modules")
+        .join("mocha")
+        .join("bin")
+        .join("mocha.js");
+    let (program, initial_args) = if mocha_js.is_file() {
+        (
+            "node".to_string(),
+            vec![mocha_js.to_string_lossy().to_string()],
+        )
+    } else {
+        let mocha_bin = find_mocha_binary(&cwd);
+        (mocha_bin.to_string_lossy().to_string(), Vec::new())
+    };
 
     // 4. Locate rocha-loader
     let loader_path = find_loader_path(&project_root);
@@ -259,7 +288,8 @@ pub fn run_compat_mocha(args: &crate::CliArgs) -> anyhow::Result<ExitStatus> {
         }
     }
 
-    let mut cmd = Command::new(&mocha_bin);
+    let mut cmd = Command::new(&program);
+    cmd.args(&initial_args);
     cmd.args(&cmd_args)
         .env("ROCHA_NODE_CLASS", &node_class)
         .env("ROCHA_CACHE_DIR", &cache_dir)
@@ -268,17 +298,36 @@ pub fn run_compat_mocha(args: &crate::CliArgs) -> anyhow::Result<ExitStatus> {
 
     let status = cmd
         .status()
-        .with_context(|| format!("Failed to execute mocha at {:?}", mocha_bin))?;
+        .with_context(|| format!("Failed to execute mocha at {:?}", program))?;
 
     Ok(status)
 }
 
 fn find_mocha_binary(cwd: &Path) -> PathBuf {
-    let local_mocha = cwd.join("node_modules").join(".bin").join("mocha");
-    if local_mocha.is_file() {
-        return local_mocha;
+    #[cfg(windows)]
+    {
+        let local_cmd = cwd.join("node_modules").join(".bin").join("mocha.cmd");
+        if local_cmd.is_file() {
+            return local_cmd;
+        }
+        let local_exe = cwd.join("node_modules").join(".bin").join("mocha.exe");
+        if local_exe.is_file() {
+            return local_exe;
+        }
+        let local_mocha = cwd.join("node_modules").join(".bin").join("mocha");
+        if local_mocha.is_file() {
+            return local_mocha;
+        }
+        PathBuf::from("mocha.cmd")
     }
-    PathBuf::from("mocha")
+    #[cfg(not(windows))]
+    {
+        let local_mocha = cwd.join("node_modules").join(".bin").join("mocha");
+        if local_mocha.is_file() {
+            return local_mocha;
+        }
+        PathBuf::from("mocha")
+    }
 }
 
 fn find_loader_path(project_root: &Path) -> PathBuf {

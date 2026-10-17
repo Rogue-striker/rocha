@@ -64,6 +64,7 @@ impl JsReporterBridge {
         };
 
         let mut cmd = Command::new("node");
+        cmd.current_dir(workspace_root);
         cmd.arg(&bridge_script);
         cmd.arg("--reporter");
         cmd.arg(&resolved_reporter);
