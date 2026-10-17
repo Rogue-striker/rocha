@@ -1,0 +1,20 @@
+{
+  "exitCode": 0,
+  "result": {
+    "stats": {
+      "suites": 1,
+      "tests": 1,
+      "passes": 1,
+      "pending": 0,
+      "failures": 0
+    },
+    "passes": [
+      {
+        "title": "should run this only test",
+        "fullTitle": "Only Filtering Suite should run this only test"
+      }
+    ],
+    "pending": [],
+    "failures": []
+  }
+}

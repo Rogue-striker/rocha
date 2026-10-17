@@ -1,0 +1,24 @@
+{
+  "exitCode": 0,
+  "result": {
+    "stats": {
+      "suites": 1,
+      "tests": 2,
+      "passes": 2,
+      "pending": 0,
+      "failures": 0
+    },
+    "passes": [
+      {
+        "title": "handles async await",
+        "fullTitle": "Async Promises Suite handles async await"
+      },
+      {
+        "title": "handles returned promises",
+        "fullTitle": "Async Promises Suite handles returned promises"
+      }
+    ],
+    "pending": [],
+    "failures": []
+  }
+}

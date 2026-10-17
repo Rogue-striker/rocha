@@ -1,0 +1,20 @@
+{
+  "exitCode": 0,
+  "result": {
+    "stats": {
+      "suites": 1,
+      "tests": 1,
+      "passes": 1,
+      "pending": 0,
+      "failures": 0
+    },
+    "passes": [
+      {
+        "title": "handles done callback success",
+        "fullTitle": "Done Callback Suite handles done callback success"
+      }
+    ],
+    "pending": [],
+    "failures": []
+  }
+}
