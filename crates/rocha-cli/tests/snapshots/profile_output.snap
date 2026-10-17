@@ -1,0 +1,12 @@
+=== Rocha Execution Profile ===
+Wall Clock Time:
+Phase Breakdown:
+  - discovery:
+  - transform:
+  - spawn:
+  - load:
+  - run:
+  - report:
+Sum of Phases:
+Top
+===============================

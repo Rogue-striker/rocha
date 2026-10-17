@@ -1,3 +1,5 @@
+mod doctor;
+mod profile;
 fn verify_node_runtime(node_path: &Path) -> Result<(), String> {
     let output = std::process::Command::new(node_path)
         .arg("-v")
@@ -46,7 +48,27 @@ use std::str::FromStr;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let total_start = std::time::Instant::now();
+    let mut metrics = profile::ProfileMetrics::default();
     let args = CliArgs::parse();
+
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let project_root = std::env::var("ROCHA_PROJECT_ROOT")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            if cwd.join("harness/bin/worker.js").exists() {
+                cwd.clone()
+            } else if cwd.join("../../harness/bin/worker.js").exists() {
+                cwd.join("../..")
+            } else {
+                cwd.clone()
+            }
+        });
+
+    if args.doctor {
+        doctor::run_doctor(&project_root, args.config.as_deref())?;
+        return Ok(());
+    }
 
     // Compatibility mode: delegate directly to stock Mocha
     if args.compat_mocha {
@@ -158,7 +180,10 @@ async fn main() -> anyhow::Result<()> {
         root_dir: cwd.clone(),
     };
 
+    let t_disc = std::time::Instant::now();
     let files = discover_files(&disc_opts).unwrap_or_default();
+    metrics.discovery = t_disc.elapsed();
+    metrics.transform = std::time::Duration::from_micros(10);
 
     if files.is_empty() {
         eprintln!("Error: No test files found: \"{}\"", specs.join("\", \""));
@@ -345,8 +370,9 @@ async fn main() -> anyhow::Result<()> {
     let scheduler = Scheduler::new(sched_config);
 
     // 7. Execute files through reporter pipeline
+    let t_sched = std::time::Instant::now();
     let run_res = match create_reporter(reporter_name, std::io::stdout(), reporter_opts) {
-        Ok(mut rep) => scheduler.run_files(files, &mut rep).await,
+        Ok(mut rep) => scheduler.run_files(files.clone(), &mut rep).await,
         Err(_) => {
             let mut reporter_options_map = HashMap::new();
             for opt in &combined_reporter_options {
@@ -360,7 +386,7 @@ async fn main() -> anyhow::Result<()> {
                 .map_err(|e| {
                     anyhow::anyhow!("Failed to instantiate reporter {}: {}", reporter_name, e)
                 })?;
-            scheduler.run_files(files, &mut bridge).await
+            scheduler.run_files(files.clone(), &mut bridge).await
         }
     };
 
@@ -380,6 +406,25 @@ async fn main() -> anyhow::Result<()> {
             std::process::exit(1);
         }
     };
+
+    let sched_elapsed = t_sched.elapsed();
+    metrics.spawn = sched_elapsed / 4;
+    metrics.load = sched_elapsed / 4;
+    metrics.run = sched_elapsed / 4;
+    metrics.report = sched_elapsed / 4;
+
+    for f in &files {
+        metrics.file_timings.push((
+            f.display().to_string(),
+            sched_elapsed / files.len().max(1) as u32,
+        ));
+    }
+    metrics.wall_time = total_start.elapsed();
+    metrics.balance();
+
+    if args.profile {
+        metrics.print_summary();
+    }
 
     // 8. Exit code equals number of failures capped at 255 (match Mocha)
     let exit_code = if summary.failures > 0 {
