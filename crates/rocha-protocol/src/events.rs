@@ -181,6 +181,11 @@ pub enum WorkerMessage {
         /// Serialized error information.
         error: ProtocolError,
     },
+    /// Worker process crashed or exited unexpectedly while running a file.
+    WorkerCrashed {
+        /// Test file being executed when worker crashed.
+        file: String,
+    },
 }
 
 /// Commands emitted by the orchestrator and sent to a worker process.

@@ -116,6 +116,7 @@ fn test_worker_lifecycle_and_event_sequence() {
             WorkerMessage::FileDone { .. } => "FileDone",
             WorkerMessage::Log { .. } => "Log",
             WorkerMessage::Fatal { .. } => "Fatal",
+            WorkerMessage::WorkerCrashed { .. } => "WorkerCrashed",
         })
         .collect();
 

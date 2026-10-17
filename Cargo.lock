@@ -1440,7 +1440,9 @@ dependencies = [
 name = "rocha-worker"
 version = "0.1.0"
 dependencies = [
+ "rmp-serde",
  "rocha-protocol",
+ "serde",
  "thiserror",
  "tokio",
  "tracing",
