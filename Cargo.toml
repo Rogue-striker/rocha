@@ -15,7 +15,7 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-authors = ["Rocha Contributors"]
+authors = ["rogue-striker"]
 license = "MIT"
 repository = "https://github.com/rocha-runner/rocha"
 
@@ -44,4 +44,3 @@ targets = [
     "x86_64-pc-windows-msvc",
 ]
 pr-run-mode = "plan"
-
