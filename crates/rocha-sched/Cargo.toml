@@ -1,0 +1,13 @@
+[package]
+name = "rocha-sched"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+rocha-worker = { path = "../rocha-worker" }
+rocha-protocol = { path = "../rocha-protocol" }
