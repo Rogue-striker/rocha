@@ -46,6 +46,6 @@ Performance results comparing stock Mocha against Rocha across the synthetic ben
    - Rocha optimized external phases: native file discovery, parallel TS pre-transpilation with `oxc`, and cached transforms.
    - However, the **in-suite test execution time remained fixed (~900–1,000 ms)** because the suite was still executed by stock Mocha's `node_modules/.bin/mocha`. Stock Mocha allocates 20,000 full `Suite` and `Test` prototype instances with heavy event listener graphs, domains, and assertion diff formatting even when all tests pass.
 2. **In Native Rocha Mode (`rocha`)**:
-   - The test bodies run on Rocha's thin JS test harness ([`harness/src/runner.js`](../harness/src/runner.js) + [`harness/src/builder.js`](../harness/src/builder.js)).
+   - The test bodies run on Rocha's thin JS test harness ([`harness/src/runner.js`](../harness/src/runner.js) + [`harness/src/interface-bdd.js`](../harness/src/interface-bdd.js)).
    - Tests execute with minimal plain-object overhead, direct function invocations, and outer-to-inner hooks without heavy prototype chains.
    - The test suite execution time itself dropped from **1,277 ms in Mocha down to 442 ms in Rocha**, achieving a total wall time of **470 ms**.
