@@ -146,9 +146,47 @@ pub fn discover_files(options: &DiscoveryOptions) -> Result<Vec<PathBuf>, Discov
                 }
             })?;
 
-            // Walk from root_dir to find matching files
-            for entry in WalkDir::new(&options.root_dir)
+            // Determine walk root: find static prefix directory before any glob characters
+            let magic_pos = spec.find(['*', '?', '[', '{']);
+            let walk_root = match magic_pos {
+                Some(pos) => {
+                    let prefix = &spec[..pos];
+                    if let Some(slash_pos) = prefix.rfind('/') {
+                        let candidate = options.root_dir.join(&prefix[..slash_pos]);
+                        if candidate.is_dir() {
+                            candidate
+                        } else {
+                            options.root_dir.clone()
+                        }
+                    } else {
+                        options.root_dir.clone()
+                    }
+                }
+                None => options.root_dir.clone(),
+            };
+
+            let is_recursive_glob = spec.contains("**") || options.recursive;
+            let mut walker = WalkDir::new(&walk_root);
+            if !is_recursive_glob && walk_root != options.root_dir {
+                walker = walker.max_depth(1);
+            }
+
+            for entry in walker
                 .into_iter()
+                .filter_entry(|e| {
+                    if e.file_type().is_dir() {
+                        let name = e.file_name().to_string_lossy();
+                        if (name == ".git"
+                            || name == "node_modules"
+                            || name == "target"
+                            || name == ".rocha")
+                            && !spec.contains(name.as_ref())
+                        {
+                            return false;
+                        }
+                    }
+                    true
+                })
                 .filter_map(|e| e.ok())
             {
                 let path = entry.path();
@@ -159,13 +197,10 @@ pub fn discover_files(options: &DiscoveryOptions) -> Result<Vec<PathBuf>, Discov
 
                     if (glob_set.is_match(rel_str.as_ref()) || glob_set.is_match(full_str.as_ref()))
                         && has_matching_extension(path, &options.extensions)
+                        && seen.insert(path.to_path_buf())
+                        && !is_ignored(path, &options.root_dir, &ignore_set, &options.ignore)
                     {
-                        let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-                        if seen.insert(canonical)
-                            && !is_ignored(path, &options.root_dir, &ignore_set, &options.ignore)
-                        {
-                            discovered.push(path.to_path_buf());
-                        }
+                        discovered.push(path.to_path_buf());
                     }
                 }
             }

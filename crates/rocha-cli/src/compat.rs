@@ -54,7 +54,6 @@ pub fn run_compat_mocha(args: &crate::CliArgs) -> anyhow::Result<ExitStatus> {
         sort: config.sort,
         root_dir: cwd.clone(),
     };
-
     let discovered_files = discover_files(&disc_opts).context("Native file discovery failed")?;
 
     if discovered_files.is_empty() {
@@ -86,10 +85,9 @@ pub fn run_compat_mocha(args: &crate::CliArgs) -> anyhow::Result<ExitStatus> {
     });
 
     let manifest_path = rocha_dir.join("manifest.json");
-
     if let Ok(cache) = DiskCache::new(&cache_dir, DEFAULT_MAX_CACHE_BYTES) {
-        // Collect all test files and helper files under directories of specs
-        let mut all_ts_files: Vec<PathBuf> = Vec::new();
+        let mut all_ts_files: Vec<PathBuf> = Vec::with_capacity(discovered_files.len() + 32);
+        let mut parent_dirs: std::collections::HashSet<PathBuf> = std::collections::HashSet::new();
 
         for p in &discovered_files {
             if let Some(ext) = p.extension().and_then(|e| e.to_str()) {
@@ -101,14 +99,18 @@ pub fn run_compat_mocha(args: &crate::CliArgs) -> anyhow::Result<ExitStatus> {
                 }
             }
             if let Some(parent) = p.parent() {
-                let helper_dir = parent.join("src");
-                if helper_dir.is_dir() {
-                    if let Ok(entries) = fs::read_dir(&helper_dir) {
-                        for entry in entries.flatten() {
-                            let path = entry.path();
-                            if path.extension().and_then(|e| e.to_str()) == Some("ts") {
-                                all_ts_files.push(path);
-                            }
+                parent_dirs.insert(parent.to_path_buf());
+            }
+        }
+
+        for parent in parent_dirs {
+            let helper_dir = parent.join("src");
+            if helper_dir.is_dir() {
+                if let Ok(entries) = fs::read_dir(&helper_dir) {
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if path.extension().and_then(|e| e.to_str()) == Some("ts") {
+                            all_ts_files.push(path);
                         }
                     }
                 }
@@ -117,36 +119,65 @@ pub fn run_compat_mocha(args: &crate::CliArgs) -> anyhow::Result<ExitStatus> {
         all_ts_files.sort();
         all_ts_files.dedup();
 
-        let transform_opts = TransformOptions::default();
-        let manifest_entries: Vec<(String, serde_json::Value)> = all_ts_files
-            .par_iter()
-            .filter_map(|file_path| {
-                if let Ok(canonical) = file_path.canonicalize() {
+        let manifest_mtime = fs::metadata(&manifest_path).and_then(|m| m.modified()).ok();
+
+        let needs_manifest_update = match manifest_mtime {
+            Some(mtime) => all_ts_files.par_iter().any(|file_path| {
+                fs::metadata(file_path)
+                    .and_then(|m| m.modified())
+                    .map(|t| t > mtime)
+                    .unwrap_or(true)
+            }),
+            None => true,
+        };
+
+        if needs_manifest_update {
+            let transform_opts = TransformOptions::default();
+            let manifest_entries: Vec<(String, serde_json::Value)> = all_ts_files
+                .par_iter()
+                .filter_map(|file_path| {
+                    let canonical = file_path
+                        .canonicalize()
+                        .unwrap_or_else(|_| file_path.clone());
                     if let Ok(entry) =
                         transform_file_and_cache(&canonical, &transform_opts, &cache, &node_class)
                     {
+                        let mut final_code = entry.code;
+                        if let Some(ref sm) = entry.source_map {
+                            if !final_code.contains("sourceMappingURL=") {
+                                let b64 = base64_simd::STANDARD.encode_to_string(sm.as_bytes());
+                                final_code.push('\n');
+                                final_code
+                                    .push_str("//# sourceMappingURL=data:application/json;base64,");
+                                final_code.push_str(&b64);
+                                final_code.push('\n');
+                                final_code.push_str("//# sourceURL=");
+                                final_code.push_str(&canonical.to_string_lossy());
+                                final_code.push('\n');
+                            }
+                        }
                         let val = serde_json::json!({
                             "key": entry.meta.key,
-                            "code": entry.code,
+                            "code": final_code,
                             "sourceMap": entry.source_map,
                         });
                         return Some((canonical.to_string_lossy().to_string(), val));
                     }
-                }
-                None
-            })
-            .collect();
+                    None
+                })
+                .collect();
 
-        let mut manifest_map = serde_json::Map::new();
-        for (k, v) in manifest_entries {
-            manifest_map.insert(k, v);
+            let mut manifest_map = serde_json::Map::new();
+            for (k, v) in manifest_entries {
+                manifest_map.insert(k, v);
+            }
+
+            let _ = fs::create_dir_all(&rocha_dir);
+            let _ = fs::write(
+                &manifest_path,
+                serde_json::to_string(&manifest_map).unwrap_or_default(),
+            );
         }
-
-        let _ = fs::create_dir_all(&rocha_dir);
-        let _ = fs::write(
-            &manifest_path,
-            serde_json::to_string(&manifest_map).unwrap_or_default(),
-        );
     }
 
     // 3. Locate Mocha binary
@@ -171,10 +202,16 @@ pub fn run_compat_mocha(args: &crate::CliArgs) -> anyhow::Result<ExitStatus> {
     if config.bail {
         cmd_args.push("--bail".to_string());
     }
-    if config.parallel {
+    let run_parallel = config.parallel
+        || args.parallel
+        || (discovered_files.len() >= 100 && !config.bail && !args.dry_run);
+
+    if run_parallel {
         cmd_args.push("--parallel".to_string());
     }
-    if config.jobs > 0 {
+    if let Some(jobs) = args.jobs {
+        cmd_args.push(format!("--jobs={}", jobs));
+    } else if config.jobs > 1 {
         cmd_args.push(format!("--jobs={}", config.jobs));
     }
     if !config.reporter.is_empty() {
@@ -209,9 +246,17 @@ pub fn run_compat_mocha(args: &crate::CliArgs) -> anyhow::Result<ExitStatus> {
         cmd_args.push(format!("--node-option={}", opt));
     }
 
-    // Append native-discovered test files
-    for file in &discovered_files {
-        cmd_args.push(file.to_string_lossy().to_string());
+    // Append specs or native-discovered test files
+    let has_globs = specs.iter().any(|s| s.contains('*') || s.contains('?'));
+    if has_globs && discovered_files.len() > 100 {
+        for s in &specs {
+            cmd_args.push(s.clone());
+        }
+    } else {
+        for file in &discovered_files {
+            let rel = file.strip_prefix(&cwd).unwrap_or(file);
+            cmd_args.push(rel.to_string_lossy().to_string());
+        }
     }
 
     let mut cmd = Command::new(&mocha_bin);
