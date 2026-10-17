@@ -1,0 +1,7 @@
+{
+  // Test timeout
+  "timeout": 3500,
+  /* Slow test threshold */
+  "slow": 120,
+  "reporter": "dot" // Preferred reporter
+}

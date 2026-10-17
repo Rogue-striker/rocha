@@ -1,0 +1,9 @@
+{
+  "name": "sample-package",
+  "version": "1.0.0",
+  "mocha": {
+    "timeout": 4200,
+    "diff": false,
+    "reporter": "list"
+  }
+}

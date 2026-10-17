@@ -1,0 +1,5 @@
+{
+  "extends": "./parent.json",
+  "timeout": 8000,
+  "reporter": "json"
+}

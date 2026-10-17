@@ -1,0 +1,4 @@
+timeout: 5500
+parallel: true
+jobs: 6
+ui: tdd
