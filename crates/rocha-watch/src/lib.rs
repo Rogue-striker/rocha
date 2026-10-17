@@ -1,5 +1,8 @@
 //! File watching and incremental test execution for Rocha.
 
+pub mod import_graph;
+pub use import_graph::*;
+
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher as NotifyWatcher};
 use std::collections::HashSet;

@@ -11,6 +11,7 @@ tokio.workspace = true
 tracing.workspace = true
 notify = "6.1"
 globset = "0.4"
+rocha-transform = { path = "../rocha-transform" }
 
 [dev-dependencies]
 tempfile = "3.17"

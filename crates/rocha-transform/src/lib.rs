@@ -12,6 +12,91 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
+/// Recorded import and require metadata for a module.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct ModuleImports {
+    /// Statically resolvable import/require specifiers.
+    pub static_imports: Vec<String>,
+    /// Whether any dynamic import/require (e.g. `require(x)`) was encountered.
+    pub has_dynamic: bool,
+}
+
+/// Visitor that collects static and dynamic imports from an AST.
+struct ImportCollector {
+    static_imports: Vec<String>,
+    has_dynamic: bool,
+}
+
+impl<'a> oxc_ast_visit::Visit<'a> for ImportCollector {
+    fn visit_import_declaration(&mut self, decl: &oxc_ast::ast::ImportDeclaration<'a>) {
+        self.static_imports.push(decl.source.value.to_string());
+        oxc_ast_visit::walk::walk_import_declaration(self, decl);
+    }
+
+    fn visit_export_all_declaration(&mut self, decl: &oxc_ast::ast::ExportAllDeclaration<'a>) {
+        self.static_imports.push(decl.source.value.to_string());
+        oxc_ast_visit::walk::walk_export_all_declaration(self, decl);
+    }
+
+    fn visit_call_expression(&mut self, call: &oxc_ast::ast::CallExpression<'a>) {
+        if let oxc_ast::ast::Expression::Identifier(ref id) = call.callee {
+            if id.name == "require" {
+                if call.arguments.len() == 1 {
+                    if let oxc_ast::ast::Argument::StringLiteral(ref s) = call.arguments[0] {
+                        self.static_imports.push(s.value.to_string());
+                    } else {
+                        self.has_dynamic = true;
+                    }
+                } else {
+                    self.has_dynamic = true;
+                }
+            }
+        }
+        oxc_ast_visit::walk::walk_call_expression(self, call);
+    }
+
+    fn visit_import_expression(&mut self, expr: &oxc_ast::ast::ImportExpression<'a>) {
+        if let oxc_ast::ast::Expression::StringLiteral(ref s) = expr.source {
+            self.static_imports.push(s.value.to_string());
+        } else {
+            self.has_dynamic = true;
+        }
+        oxc_ast_visit::walk::walk_import_expression(self, expr);
+    }
+}
+
+/// Parse source code and extract all static imports/requires, flagging dynamic ones.
+pub fn extract_imports(source: &str, path: &Path) -> Result<ModuleImports, TransformError> {
+    use oxc_ast_visit::Visit;
+    let allocator = Allocator::default();
+    let source_type = SourceType::from_path(path).unwrap_or_else(|_| SourceType::ts());
+
+    let parsed = Parser::new(&allocator, source, source_type).parse();
+    if !parsed.diagnostics.is_empty() {
+        let msg = parsed
+            .diagnostics
+            .iter()
+            .map(|e| e.to_string())
+            .collect::<Vec<_>>()
+            .join("; ");
+        return Err(TransformError::SyntaxError {
+            path: path.to_path_buf(),
+            message: msg,
+        });
+    }
+
+    let mut collector = ImportCollector {
+        static_imports: Vec::new(),
+        has_dynamic: false,
+    };
+    collector.visit_program(&parsed.program);
+
+    Ok(ModuleImports {
+        static_imports: collector.static_imports,
+        has_dynamic: collector.has_dynamic,
+    })
+}
+
 pub mod cache;
 pub use cache::*;
 
@@ -155,6 +240,8 @@ pub struct TransformOutput {
     pub code: String,
     /// External source map JSON string.
     pub source_map: Option<String>,
+    /// Extracted import dependencies.
+    pub imports: ModuleImports,
 }
 
 /// Transform source code stripping TypeScript types, compiling JSX, and producing source maps.
@@ -181,6 +268,13 @@ pub fn transform_source(
     }
 
     let mut program = parsed.program;
+
+    use oxc_ast_visit::Visit;
+    let mut collector = ImportCollector {
+        static_imports: Vec::new(),
+        has_dynamic: false,
+    };
+    collector.visit_program(&program);
 
     // Build semantic analysis and scoping for transformation
     let semantic_ret = SemanticBuilder::new().with_enum_eval(true).build(&program);
@@ -220,6 +314,10 @@ pub fn transform_source(
     Ok(TransformOutput {
         code: result.code,
         source_map: map_json,
+        imports: ModuleImports {
+            static_imports: collector.static_imports,
+            has_dynamic: collector.has_dynamic,
+        },
     })
 }
 
