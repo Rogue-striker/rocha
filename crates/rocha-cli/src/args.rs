@@ -32,6 +32,10 @@ pub struct CliArgs {
     #[arg(long = "file", value_name = "PATH", action = ArgAction::Append)]
     pub file: Vec<String>,
 
+    /// Register custom ESM loader.
+    #[arg(long = "loader", value_name = "MODULE", action = ArgAction::Append)]
+    pub loader: Vec<String>,
+
     /// Trigger only tests matching pattern.
     #[arg(short = 'g', long = "grep", value_name = "PATTERN")]
     pub grep: Option<String>,
@@ -441,6 +445,12 @@ mod tests {
     fn test_25_file_repeated() {
         let args = parse_args(["--file", "setup.js", "--file", "env.js"]).unwrap();
         assert_eq!(args.file, vec!["setup.js", "env.js"]);
+    }
+
+    #[test]
+    fn test_25b_loader_repeated() {
+        let args = parse_args(["--loader", "ts-node/esm", "--loader", "./custom.mjs"]).unwrap();
+        assert_eq!(args.loader, vec!["ts-node/esm", "./custom.mjs"]);
     }
 
     #[test]

@@ -18,6 +18,7 @@ async fn test_normal_run() {
         node_options: Vec::new(),
         handshake_timeout: Duration::from_secs(5),
         inline_script: None,
+        ..Default::default()
     };
 
     let mut worker = WorkerProcess::spawn(&config).await.expect("Spawn failed");
@@ -81,6 +82,7 @@ async fn test_version_mismatch() {
         node_options: Vec::new(),
         handshake_timeout: Duration::from_secs(2),
         inline_script: Some(script.into()),
+        ..Default::default()
     };
 
     let err = WorkerProcess::spawn(&config).await.unwrap_err();
@@ -111,6 +113,7 @@ async fn test_worker_prints_garbage_on_protocol_channel() {
         node_options: Vec::new(),
         handshake_timeout: Duration::from_secs(2),
         inline_script: Some(script.into()),
+        ..Default::default()
     };
 
     let err = WorkerProcess::spawn(&config).await.unwrap_err();
@@ -141,6 +144,7 @@ async fn test_worker_hangs_timeout_fires() {
         node_options: Vec::new(),
         handshake_timeout: Duration::from_secs(2),
         inline_script: Some(script.into()),
+        ..Default::default()
     };
 
     let mut worker = WorkerProcess::spawn(&config).await.expect("Spawn failed");
@@ -179,6 +183,7 @@ async fn test_worker_killed_mid_test() {
         node_options: Vec::new(),
         handshake_timeout: Duration::from_secs(2),
         inline_script: Some(script.into()),
+        ..Default::default()
     };
 
     let mut worker = WorkerProcess::spawn(&config).await.expect("Spawn failed");

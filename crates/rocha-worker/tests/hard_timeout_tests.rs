@@ -36,6 +36,7 @@ async fn test_while_true_hard_timeout_and_continuation() {
         node_options: Vec::new(),
         handshake_timeout: Duration::from_secs(5),
         inline_script: None,
+        ..Default::default()
     };
 
     let mut worker = WorkerProcess::spawn(&config).await.expect("Spawn failed");

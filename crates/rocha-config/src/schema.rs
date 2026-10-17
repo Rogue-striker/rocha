@@ -33,6 +33,9 @@ pub struct Config {
     /// Explicit files to include before any suite files.
     pub file: Vec<String>,
 
+    /// Custom Node.js ESM loader(s) to register.
+    pub loader: Vec<String>,
+
     /// Trigger only tests matching this regular expression.
     pub grep: Option<String>,
 
@@ -139,6 +142,7 @@ impl Default for Config {
             require: Vec::new(),
             import: Vec::new(),
             file: Vec::new(),
+            loader: Vec::new(),
             grep: None,
             fgrep: None,
             invert: false,

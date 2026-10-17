@@ -147,10 +147,31 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // 5. Worker configuration
-    let mut node_options = args.node_option.clone();
-    for opt in &config.node_option {
+    let mut node_options = config.node_option.clone();
+    for opt in &args.node_option {
         if !node_options.contains(opt) {
             node_options.push(opt.clone());
+        }
+    }
+
+    let mut requires = config.require.clone();
+    for req in &args.require {
+        if !requires.contains(req) {
+            requires.push(req.clone());
+        }
+    }
+
+    let mut imports = config.import.clone();
+    for imp in &args.import {
+        if !imports.contains(imp) {
+            imports.push(imp.clone());
+        }
+    }
+
+    let mut loaders = config.loader.clone();
+    for ldr in &args.loader {
+        if !loaders.contains(ldr) {
+            loaders.push(ldr.clone());
         }
     }
 
@@ -163,8 +184,18 @@ async fn main() -> anyhow::Result<()> {
         },
         harness_worker_path,
         node_options,
+        requires,
+        imports,
+        loaders,
         ..Default::default()
     };
+
+    let mut files_to_run_first = config.file.clone();
+    for f in &args.file {
+        if !files_to_run_first.contains(f) {
+            files_to_run_first.push(f.clone());
+        }
+    }
 
     // 6. Scheduler configuration
     let jobs = if args.parallel || config.parallel {
@@ -211,6 +242,7 @@ async fn main() -> anyhow::Result<()> {
         dry_run: args.dry_run || config.dry_run,
         allow_uncaught: args.allow_uncaught || config.allow_uncaught,
         delay: args.delay || config.delay,
+        files: files_to_run_first,
     };
 
     let sched_config = SchedulerConfig {

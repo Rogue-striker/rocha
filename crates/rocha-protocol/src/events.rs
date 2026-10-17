@@ -109,6 +109,9 @@ pub struct RunFileOptions {
     /// Wait for global run() callback.
     #[serde(default)]
     pub delay: bool,
+    /// Setup files to load first before any test suite files.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub files: Vec<String>,
 }
 
 /// Events emitted by worker processes and sent to the orchestrator.

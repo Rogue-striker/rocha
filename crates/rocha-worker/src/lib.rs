@@ -63,6 +63,12 @@ pub struct WorkerConfig {
     pub loader_path: Option<PathBuf>,
     /// Additional Node.js command-line options (`--node-option`).
     pub node_options: Vec<String>,
+    /// Additional `--require` modules to load in order.
+    pub requires: Vec<String>,
+    /// Additional `--import` modules to load in order.
+    pub imports: Vec<String>,
+    /// Additional `--loader` modules to register in order.
+    pub loaders: Vec<String>,
     /// Timeout for initial handshake `Ready` message.
     pub handshake_timeout: Duration,
     /// Custom script content if spawning an inline Node evaluation.
@@ -76,6 +82,9 @@ impl Default for WorkerConfig {
             harness_worker_path: PathBuf::from("harness/bin/worker.js"),
             loader_path: None,
             node_options: Vec::new(),
+            requires: Vec::new(),
+            imports: Vec::new(),
+            loaders: Vec::new(),
             handshake_timeout: Duration::from_secs(5),
             inline_script: None,
         }
@@ -105,14 +114,31 @@ impl WorkerProcess {
     pub async fn spawn(config: &WorkerConfig) -> Result<Self, WorkerError> {
         let mut cmd = Command::new(&config.node_path);
 
+        // Node options
+        for opt in &config.node_options {
+            cmd.arg(opt);
+        }
+
+        // Rocha register loader
         if let Some(ref loader) = config.loader_path {
             if loader.exists() {
                 cmd.arg("--require").arg(loader);
             }
         }
 
-        for opt in &config.node_options {
-            cmd.arg(opt);
+        // Custom requires
+        for req in &config.requires {
+            cmd.arg("--require").arg(req);
+        }
+
+        // Custom imports
+        for imp in &config.imports {
+            cmd.arg("--import").arg(imp);
+        }
+
+        // Custom loaders
+        for ldr in &config.loaders {
+            cmd.arg("--loader").arg(ldr);
         }
 
         if let Some(ref script) = config.inline_script {

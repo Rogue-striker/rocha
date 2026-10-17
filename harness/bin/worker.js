@@ -210,6 +210,11 @@ async function executeFile(filePath, options) {
   });
 
   try {
+    if (options.files && Array.isArray(options.files)) {
+      for (const preFile of options.files) {
+        harness.loadFile(path.resolve(preFile));
+      }
+    }
     harness.loadFile(absPath);
     await runner.run(harness.rootSuite);
   } catch (err) {
