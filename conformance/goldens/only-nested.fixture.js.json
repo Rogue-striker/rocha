@@ -1,0 +1,24 @@
+{
+  "exitCode": 0,
+  "result": {
+    "stats": {
+      "suites": 1,
+      "tests": 2,
+      "passes": 2,
+      "pending": 0,
+      "failures": 0
+    },
+    "passes": [
+      {
+        "title": "runs test 1 in only suite",
+        "fullTitle": "Exclusive Suite runs test 1 in only suite"
+      },
+      {
+        "title": "runs test 2 in only suite",
+        "fullTitle": "Exclusive Suite runs test 2 in only suite"
+      }
+    ],
+    "pending": [],
+    "failures": []
+  }
+}

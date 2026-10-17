@@ -68,6 +68,13 @@ class Suite {
     this.slow = parent ? parent.slow : 75;
     this.retries = parent ? parent.retries : 0;
     this.delayed = false;
+    this._bail = false;
+  }
+
+  bail(val) {
+    if (arguments.length === 0) return this._bail;
+    this._bail = Boolean(val);
+    return this;
   }
 
   getRoot() {
