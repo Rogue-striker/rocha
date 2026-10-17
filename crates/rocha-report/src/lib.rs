@@ -9,7 +9,10 @@ pub mod merger;
 pub mod min;
 pub mod spec;
 pub mod tap;
+pub mod tty;
 pub mod xunit;
+
+pub use tty::{detect_color_support, detect_terminal_width, resolve_color_support, ReportSymbols};
 
 pub use base::ReporterOptions;
 pub use dot::DotReporter;
