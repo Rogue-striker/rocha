@@ -35,3 +35,13 @@
 - **Measurement:** Post-D-3 profiling on `medium` suite (`rocha --profile --isolate=none`) measures total wall time at 158.67ms. Worker spawn (33.68ms / 21.2%) plus harness loading (43.80ms / 27.6%) amounts to 77.48ms (48.8% of wall time), clearly surpassing the 25% threshold.
 - **Decision:** Activate Milestone M7 to conduct feasibility spike (X-1), evaluate Node API shim scope (X-2), and implement `--engine=embedded` opt-in with Node fallback (X-3).
 - **Status:** Accepted.
+
+### D-005: Node API Shim Scope Decision (X-2)
+- **Context:** Task X-2 evaluates which Node.js standard modules to polyfill (`assert`, `path`, `util`, `events`, `fs` subset) for the embedded engine and requires a formal go/no-go product decision.
+- **Evaluation:**
+  - The feasibility spike (X-1 report `docs/embedded-engine-spike.md`) reveals that 100% of the real-world Mocha corpus (G-1) requires Node.js built-ins.
+  - Polyfilling `assert`, `path`, and `util` unlocks only 10% of test suites; expanding to `fs` and `events` reaches only 30%, while 70% of suites require streams, child processes, cryptography, or native C++ addons.
+  - Polyfilling and maintaining Node.js standard library parity is an enormous, unending effort that duplicates projects like Deno and Bun.
+  - Rocha's native architecture already solves the startup bottleneck through warm worker reuse (`--isolate=none`), completing 5,000 tests across 400 files in 148 ms with 100% stock Mocha compatibility.
+- **Decision:** **NO-GO** on building an extensive Node API shim layer. The primary execution engine for Rocha remains Node.js workers. An opt-in `--engine=embedded` flag is provided for lightweight, zero-dependency unit tests, with immediate fallback to Node whenever unsupported Node built-in modules are detected.
+- **Status:** Accepted (No-go on full Node shim; hybrid fallback accepted).
