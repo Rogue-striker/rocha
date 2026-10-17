@@ -38,7 +38,7 @@
 | D-4 | done | agent | 8493535 | Timing history and longest-first ordering |
 | D-5 | done | agent | 52b930a | Work stealing and suite-level splitting (conditional) |
 | D-6 | done | agent | 7c891ea | Sharding |
-| D-7 | todo | | | Bail, retries, and abort propagation |
+| D-7 | done | agent | 2b20b86 | Bail, retries, and abort propagation |
 | D-8 | todo | | | Isolation modes |
 | E-1 | todo | | | Main run pipeline |
 | E-2 | todo | | | --require, --import, --file, --loader, --node-option |
