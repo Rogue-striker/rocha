@@ -1,5 +1,8 @@
 # Rocha
 
+[![CI](https://github.com/Rogue-striker/rocha/actions/workflows/ci.yml/badge.svg)](https://github.com/Rogue-striker/rocha/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 **Rocha** is a blazing-fast native (Rust) orchestrator for Mocha-style test suites, designed as a drop-in replacement for the `mocha` CLI.
 
 Rocha keeps test execution in standard Node.js workers while shifting file discovery, TypeScript/ESM transforms, process pooling, scheduling, timeouts, and report generation into native compiled code.
