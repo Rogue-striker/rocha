@@ -47,7 +47,7 @@
 | E-5 | done | agent | 220080d | Conformance push to >= 98% |
 | F-1 | done | agent | d4821d5 | File watcher |
 | F-2 | done | agent | 3e85c22 | Import graph and affected tests |
-| F-3 | todo | | | Interactive controls |
+| F-3 | done | agent | f03d10e | Interactive controls |
 | F-4 | todo | | | Diagnostics |
 | G-1 | todo | | | Real-world corpus |
 | G-2 | todo | | | Robustness testing |
