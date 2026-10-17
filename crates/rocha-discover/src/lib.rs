@@ -5,6 +5,9 @@
 //! - Applies extension filtering, recursive traversal, ignore patterns, and deduplication
 //! - Deterministic ordering with `--sort` support
 
+pub mod path_norm;
+pub use path_norm::*;
+
 use globset::{GlobBuilder, GlobSet, GlobSetBuilder};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
