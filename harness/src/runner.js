@@ -325,7 +325,7 @@ class Runner extends EventEmitter {
           testContext._slow = test.slow !== undefined ? test.slow : 75;
           testContext._retries = typeof suiteContext._retries === "number" && suiteContext._retries > 0 
             ? suiteContext._retries 
-            : (test.retries || 0);
+            : (typeof test.retries === "number" && test.retries > 0 ? test.retries : (this.options.retries || 0));
           testContext._currentRetry = attempt;
           testContext.timeout = function(ms) {
             if (!arguments.length) return this._timeout !== null && this._timeout !== undefined ? this._timeout : 2000;
@@ -435,7 +435,9 @@ class Runner extends EventEmitter {
             ? testContext._retries
             : (typeof test.retries === "number" && test.retries > 0
               ? test.retries
-              : (typeof suiteContext._retries === "number" && suiteContext._retries > 0 ? suiteContext._retries : 0));
+              : (typeof suiteContext._retries === "number" && suiteContext._retries > 0
+                ? suiteContext._retries
+                : (this.options.retries || 0)));
 
           if (attempt < allowedRetries) {
             attempt++;

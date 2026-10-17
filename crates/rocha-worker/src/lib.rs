@@ -347,6 +347,28 @@ impl WorkerProcess {
         matches!(self.child.try_wait(), Ok(None))
     }
 
+    /// Return the OS process ID of the child process if active.
+    pub fn id(&self) -> Option<u32> {
+        self.child.id()
+    }
+
+    /// Abort execution promptly by sending an Abort frame, waiting up to `grace`,
+    /// and forcefully killing the child if it fails to exit.
+    pub async fn abort(&mut self, reason: &str, grace: Duration) -> Result<(), WorkerError> {
+        let frame = encode_frame(&OrchestratorMessage::Abort {
+            reason: reason.to_string(),
+        })?;
+        let _ = self.stdin.write_all(&frame).await;
+        let _ = self.stdin.flush().await;
+
+        let wait_fut = self.child.wait();
+        if tokio::time::timeout(grace, wait_fut).await.is_err() {
+            let _ = self.child.kill().await;
+            let _ = self.child.wait().await;
+        }
+        Ok(())
+    }
+
     /// Execute a test file with hard orchestrator-side timeouts.
     ///
     /// Hard timeouts:

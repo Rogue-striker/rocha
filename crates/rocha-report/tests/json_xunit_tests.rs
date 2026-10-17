@@ -66,6 +66,7 @@ fn test_json_reporter_schema_equality() {
             failures: 1,
             pending: 1,
             duration_ms: 17,
+            retries: 0,
             failure_details: Vec::new(),
         };
         reporter.finish(&summary).unwrap();
@@ -121,6 +122,7 @@ fn test_json_stream_reporter() {
             failures: 0,
             pending: 0,
             duration_ms: 4,
+            retries: 0,
             failure_details: Vec::new(),
         };
         reporter.finish(&summary).unwrap();
@@ -205,6 +207,7 @@ fn test_xunit_reporter_jenkins_xsd_compliance() {
             failures: 1,
             pending: 1,
             duration_ms: 25,
+            retries: 0,
             failure_details: Vec::new(),
         };
         reporter.finish(&summary).unwrap();

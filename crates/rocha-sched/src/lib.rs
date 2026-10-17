@@ -33,6 +33,9 @@ pub enum IsolationMode {
 /// Errors that can occur during test suite scheduling and pool execution.
 #[derive(Debug, Error)]
 pub enum SchedulerError {
+    /// Run interrupted by signal (130 for SIGINT, 143 for SIGTERM).
+    #[error("Run interrupted by signal {code}")]
+    Interrupted { code: i32, summary: Summary },
     /// Worker error.
     #[error("Worker error: {0}")]
     Worker(#[from] WorkerError),
@@ -67,6 +70,10 @@ pub struct SchedulerConfig {
     pub root_dir: PathBuf,
     /// Optional sharding specification (e.g. shard 1 of 3).
     pub shard: Option<ShardSpec>,
+    /// Whether to bail promptly on the first test failure across all workers.
+    pub bail: bool,
+    /// Shared tracker of active child process IDs (for test assertion of zero zombies).
+    pub tracked_pids: Option<Arc<Mutex<Vec<u32>>>>,
 }
 
 impl Default for SchedulerConfig {
@@ -87,6 +94,8 @@ impl Default for SchedulerConfig {
             timings_file: Some(PathBuf::from(".rocha/timings.json")),
             root_dir: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
             shard: None,
+            bail: false,
+            tracked_pids: None,
         }
     }
 }
@@ -152,10 +161,55 @@ impl Scheduler {
         let start_time = Instant::now();
         let (tx, mut rx) = mpsc::unbounded_channel::<(String, WorkerMessage)>();
 
+        // Cancellation watch channel for bail & signals
+        let (abort_tx, abort_rx) = tokio::sync::watch::channel(false);
+        let interrupted = Arc::new(std::sync::atomic::AtomicI32::new(0));
+
         // Shared queue of files
         let queue = Arc::new(Mutex::new(VecDeque::from(file_strings.clone())));
         let num_jobs = std::cmp::min(self.config.jobs, file_strings.len());
         let num_jobs = std::cmp::max(1, num_jobs);
+
+        // Spawn OS signal listener task
+        let sig_abort_tx = abort_tx.clone();
+        let sig_queue = Arc::clone(&queue);
+        let sig_interrupted = Arc::clone(&interrupted);
+
+        let signal_task = tokio::spawn(async move {
+            #[cfg(unix)]
+            {
+                use tokio::signal::unix::{signal, SignalKind};
+                let mut sigint = match signal(SignalKind::interrupt()) {
+                    Ok(s) => s,
+                    Err(_) => return,
+                };
+                let mut sigterm = match signal(SignalKind::terminate()) {
+                    Ok(s) => s,
+                    Err(_) => return,
+                };
+
+                tokio::select! {
+                    _ = sigint.recv() => {
+                        sig_interrupted.store(130, std::sync::atomic::Ordering::SeqCst);
+                        let _ = sig_abort_tx.send(true);
+                        sig_queue.lock().await.clear();
+                    }
+                    _ = sigterm.recv() => {
+                        sig_interrupted.store(143, std::sync::atomic::Ordering::SeqCst);
+                        let _ = sig_abort_tx.send(true);
+                        sig_queue.lock().await.clear();
+                    }
+                }
+            }
+            #[cfg(not(unix))]
+            {
+                if tokio::signal::ctrl_c().await.is_ok() {
+                    sig_interrupted.store(130, std::sync::atomic::Ordering::SeqCst);
+                    let _ = sig_abort_tx.send(true);
+                    sig_queue.lock().await.clear();
+                }
+            }
+        });
 
         let mut worker_tasks = Vec::new();
 
@@ -163,6 +217,7 @@ impl Scheduler {
             let q = Arc::clone(&queue);
             let tx_clone = tx.clone();
             let config = self.config.clone();
+            let mut worker_abort_rx = abort_rx.clone();
 
             let task = tokio::spawn(async move {
                 match config.isolate {
@@ -171,30 +226,57 @@ impl Scheduler {
                             Ok(w) => w,
                             Err(e) => return Err(SchedulerError::Worker(e)),
                         };
+                        if let Some(ref pids) = config.tracked_pids {
+                            if let Some(pid) = worker.id() {
+                                pids.lock().await.push(pid);
+                            }
+                        }
 
                         while let Some(file) = {
-                            let mut guard = q.lock().await;
-                            guard.pop_front()
+                            if *worker_abort_rx.borrow() {
+                                None
+                            } else {
+                                let mut guard = q.lock().await;
+                                guard.pop_front()
+                            }
                         } {
                             if !worker.is_alive() {
                                 worker = match WorkerProcess::spawn(&config.worker_config).await {
                                     Ok(w) => w,
                                     Err(e) => return Err(SchedulerError::Worker(e)),
                                 };
+                                if let Some(ref pids) = config.tracked_pids {
+                                    if let Some(pid) = worker.id() {
+                                        pids.lock().await.push(pid);
+                                    }
+                                }
                             }
                             let tx = tx_clone.clone();
                             let file_name = file.clone();
-                            let _ = worker
-                                .run_file_with_hard_timeout(
-                                    &file,
-                                    config.run_options.clone(),
-                                    config.file_timeout,
-                                    config.test_grace,
-                                    |ev| {
-                                        let _ = tx.send((file_name.clone(), ev.clone()));
-                                    },
-                                )
-                                .await;
+                            let aborted = {
+                                let mut run_fut = std::pin::pin!(worker
+                                    .run_file_with_hard_timeout(
+                                        &file,
+                                        config.run_options.clone(),
+                                        config.file_timeout,
+                                        config.test_grace,
+                                        |ev| {
+                                            let _ = tx.send((file_name.clone(), ev.clone()));
+                                        },
+                                    ));
+
+                                tokio::select! {
+                                    _ = &mut run_fut => false,
+                                    _ = worker_abort_rx.changed() => *worker_abort_rx.borrow(),
+                                }
+                            };
+
+                            if aborted {
+                                let _ = worker
+                                    .abort("execution aborted", Duration::from_millis(500))
+                                    .await;
+                                return Ok(());
+                            }
                         }
 
                         let _ = worker.shutdown().await;
@@ -204,8 +286,12 @@ impl Scheduler {
                         let mut active_worker: Option<WorkerProcess> = None;
 
                         while let Some(file) = {
-                            let mut guard = q.lock().await;
-                            guard.pop_front()
+                            if *worker_abort_rx.borrow() {
+                                None
+                            } else {
+                                let mut guard = q.lock().await;
+                                guard.pop_front()
+                            }
                         } {
                             let mut worker = match active_worker.take() {
                                 Some(w) => w,
@@ -214,8 +300,13 @@ impl Scheduler {
                                     Err(e) => return Err(SchedulerError::Worker(e)),
                                 },
                             };
+                            if let Some(ref pids) = config.tracked_pids {
+                                if let Some(pid) = worker.id() {
+                                    pids.lock().await.push(pid);
+                                }
+                            }
 
-                            let has_more = !q.lock().await.is_empty();
+                            let has_more = !q.lock().await.is_empty() && !*worker_abort_rx.borrow();
                             let spare_task = if has_more {
                                 let w_cfg = config.worker_config.clone();
                                 Some(tokio::spawn(
@@ -227,26 +318,53 @@ impl Scheduler {
 
                             let tx = tx_clone.clone();
                             let file_name = file.clone();
-                            let _ = worker
-                                .run_file_with_hard_timeout(
-                                    &file,
-                                    config.run_options.clone(),
-                                    config.file_timeout,
-                                    config.test_grace,
-                                    |ev| {
-                                        let _ = tx.send((file_name.clone(), ev.clone()));
-                                    },
-                                )
-                                .await;
+                            let aborted = {
+                                let mut run_fut = std::pin::pin!(worker
+                                    .run_file_with_hard_timeout(
+                                        &file,
+                                        config.run_options.clone(),
+                                        config.file_timeout,
+                                        config.test_grace,
+                                        |ev| {
+                                            let _ = tx.send((file_name.clone(), ev.clone()));
+                                        },
+                                    ));
 
-                            let _ = worker.shutdown().await;
+                                tokio::select! {
+                                    _ = &mut run_fut => false,
+                                    _ = worker_abort_rx.changed() => *worker_abort_rx.borrow(),
+                                }
+                            };
+
+                            if aborted {
+                                let _ = worker
+                                    .abort("execution aborted", Duration::from_millis(500))
+                                    .await;
+                            } else {
+                                let _ = worker.shutdown().await;
+                            }
 
                             if let Some(st) = spare_task {
                                 match st.await {
-                                    Ok(Ok(w)) => active_worker = Some(w),
+                                    Ok(Ok(mut w)) => {
+                                        if let Some(ref pids) = config.tracked_pids {
+                                            if let Some(pid) = w.id() {
+                                                pids.lock().await.push(pid);
+                                            }
+                                        }
+                                        if aborted || *worker_abort_rx.borrow() {
+                                            let _ = w.shutdown().await;
+                                        } else {
+                                            active_worker = Some(w);
+                                        }
+                                    }
                                     Ok(Err(e)) => return Err(SchedulerError::Worker(e)),
                                     Err(je) => return Err(SchedulerError::Join(je)),
                                 }
+                            }
+
+                            if aborted {
+                                return Ok(());
                             }
                         }
 
@@ -270,11 +388,25 @@ impl Scheduler {
         let mut file_durations: Vec<(String, f64)> = Vec::new();
 
         while let Some((file, event)) = rx.recv().await {
+            // Check for test or hook failure when bail is enabled
+            if (self.config.bail || self.config.run_options.bail)
+                && matches!(
+                    &event,
+                    WorkerMessage::TestFail { .. } | WorkerMessage::HookFail { .. }
+                )
+            {
+                let _ = abort_tx.send(true);
+                let mut guard = queue.lock().await;
+                guard.clear();
+            }
+
             if let WorkerMessage::FileDone { counts, .. } = &event {
                 file_durations.push((file.clone(), counts.duration_ms as f64));
             }
             merger.push(&file, event, reporter);
         }
+
+        signal_task.abort();
 
         // Update timing history
         if let Some(ref timings_path) = self.config.timings_file {
@@ -293,6 +425,15 @@ impl Scheduler {
 
         merger.set_duration_ms(start_time.elapsed().as_millis() as u64);
         let summary = merger.finish(reporter)?;
+
+        let sig_code = interrupted.load(std::sync::atomic::Ordering::SeqCst);
+        if sig_code != 0 {
+            return Err(SchedulerError::Interrupted {
+                code: sig_code,
+                summary,
+            });
+        }
+
         Ok(summary)
     }
 }

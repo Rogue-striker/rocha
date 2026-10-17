@@ -14,7 +14,7 @@ class Context {
     this._runnable = runnable;
     this._timeout = runnable && runnable.timeout !== undefined ? runnable.timeout : null;
     this._slow = runnable && runnable.slow !== undefined ? runnable.slow : 75;
-    this._retries = runnable ? (runnable.retries || 0) : 0;
+    this._retries = runnable ? (typeof runnable.retries === 'function' ? runnable.retries() : (runnable.retries || 0)) : 0;
     this._currentRetry = runnable ? (runnable.currentRetry || 0) : 0;
     this._rescheduleTimer = null;
     this.onMultipleDone = null;

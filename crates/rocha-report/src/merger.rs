@@ -136,6 +136,9 @@ impl EventMerger {
                 self.tests
                     .insert(id.clone(), (suite.clone(), title.clone(), file.clone()));
             }
+            Event::Retry { .. } => {
+                self.summary.retries += 1;
+            }
             Event::TestPass { duration_ms, .. } => {
                 self.summary.passes += 1;
                 self.summary.duration_ms += duration_ms;

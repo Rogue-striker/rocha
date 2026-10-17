@@ -56,6 +56,7 @@ fn test_bridge_custom_reporter() {
         failures: 0,
         pending: 0,
         duration_ms: 4,
+        retries: 0,
         failure_details: Vec::new(),
     };
     bridge.finish(&summary).expect("Bridge finish failed");
@@ -126,6 +127,7 @@ fn test_bridge_mocha_junit_reporter() {
         failures: 0,
         pending: 0,
         duration_ms: 4,
+        retries: 0,
         failure_details: Vec::new(),
     };
     bridge.finish(&summary).expect("Bridge finish failed");

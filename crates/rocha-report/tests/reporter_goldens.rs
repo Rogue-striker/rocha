@@ -113,6 +113,7 @@ fn generate_20_fixtures() -> Vec<FixtureDef> {
                 failures: 1,
                 pending: 0,
                 duration_ms: 10,
+                retries: 0,
                 failure_details: vec![rocha_report::FailureDetail {
                     title: test_title.clone(),
                     full_title: format!("{} {}", suite_title, test_title),
@@ -138,6 +139,7 @@ fn generate_20_fixtures() -> Vec<FixtureDef> {
                 failures: 0,
                 pending: 1,
                 duration_ms: 0,
+                retries: 0,
                 failure_details: vec![],
             }
         } else {
@@ -151,6 +153,7 @@ fn generate_20_fixtures() -> Vec<FixtureDef> {
                 failures: 0,
                 pending: 0,
                 duration_ms: 5,
+                retries: 0,
                 failure_details: vec![],
             }
         };

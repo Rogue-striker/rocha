@@ -75,6 +75,9 @@ pub struct Summary {
     pub pending: usize,
     /// Total wall-clock execution duration in milliseconds.
     pub duration_ms: u64,
+    /// Total count of retries performed during the run.
+    #[serde(default)]
+    pub retries: usize,
     /// Complete list of failure details with full hierarchical titles.
     pub failure_details: Vec<FailureDetail>,
 }
@@ -165,6 +168,7 @@ mod tests {
             failures: 0,
             pending: 0,
             duration_ms: 15,
+            retries: 0,
             failure_details: Vec::new(),
         };
 
@@ -201,6 +205,7 @@ mod tests {
             failures: 1,
             pending: 0,
             duration_ms: 20,
+            retries: 0,
             failure_details: vec![FailureDetail {
                 title: "should equal".into(),
                 full_title: "MathSuite should equal".into(),
