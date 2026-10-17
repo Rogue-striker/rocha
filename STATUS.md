@@ -53,7 +53,7 @@
 | G-2 | done | agent | f27b8b0 | Robustness testing |
 | G-3 | done | agent | 6cbc063 | Cross-platform |
 | G-4 | done | agent | a15123c | Performance gate |
-| G-5 | todo | | | Packaging |
+| G-5 | done | agent | c167663 | Packaging |
 | G-6 | todo | | | Documentation |
 | X-1 | todo | | | Feasibility spike |
 | X-2 | todo | | | Node API shim scope decision |
