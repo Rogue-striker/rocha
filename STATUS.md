@@ -7,7 +7,7 @@
 | M0-3 | done | agent | ea62886 | Tracking files |
 | M0-4 | done | agent | 71f8a84 | Benchmark corpus |
 | M0-5 | done | agent | b738d51 | Baseline profile |
-| C-PROTO | todo | | | Event protocol specification |
+| C-PROTO | done | agent | b2a2015 | Event protocol specification |
 | C-CODEC | todo | | | Codec crate |
 | C-CONFIG | todo | | | Config schema |
 | C-CACHE | todo | | | Transform cache key spec |
