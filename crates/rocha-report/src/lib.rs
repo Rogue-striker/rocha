@@ -1,6 +1,7 @@
 //! Reporters and event model for Rocha test results.
 
 pub mod base;
+pub mod bridge;
 pub mod dot;
 pub mod json;
 pub mod json_stream;
@@ -15,6 +16,7 @@ pub mod xunit;
 pub use tty::{detect_color_support, detect_terminal_width, resolve_color_support, ReportSymbols};
 
 pub use base::ReporterOptions;
+pub use bridge::JsReporterBridge;
 pub use dot::DotReporter;
 pub use json::{JsonReport, JsonReporter, JsonStats, JsonTest};
 pub use json_stream::JsonStreamReporter;
