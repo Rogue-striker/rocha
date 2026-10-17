@@ -55,6 +55,6 @@
 | G-4 | done | agent | a15123c | Performance gate |
 | G-5 | done | agent | c167663 | Packaging |
 | G-6 | done | agent | 28e66f7 | Documentation |
-| X-1 | todo | | | Feasibility spike |
+| X-1 | done | agent | 0431269 | Feasibility spike |
 | X-2 | todo | | | Node API shim scope decision |
 | X-3 | todo | | | --engine=embedded opt-in |
