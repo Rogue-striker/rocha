@@ -1,5 +1,8 @@
 //! Reporters and event model for Rocha test results.
 
+pub mod merger;
+pub use merger::{EventMerger, MergeMode};
+
 use rocha_protocol::ProtocolError;
 pub use rocha_protocol::{LogStream, TestCounts, WorkerMessage as Event};
 use serde::{Deserialize, Serialize};
