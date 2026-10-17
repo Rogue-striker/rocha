@@ -2,21 +2,27 @@
 
 pub mod base;
 pub mod dot;
+pub mod json;
+pub mod json_stream;
 pub mod list;
 pub mod merger;
 pub mod min;
 pub mod spec;
 pub mod tap;
+pub mod xunit;
 
 pub use base::ReporterOptions;
 pub use dot::DotReporter;
+pub use json::{JsonReport, JsonReporter, JsonStats, JsonTest};
+pub use json_stream::JsonStreamReporter;
 pub use list::ListReporter;
 pub use merger::{EventMerger, MergeMode};
 pub use min::MinReporter;
 pub use spec::SpecReporter;
 pub use tap::TapReporter;
+pub use xunit::XUnitReporter;
 
-/// Create a reporter by name (spec, dot, min, list, tap).
+/// Create a reporter by name (spec, dot, min, list, tap, json, json-stream, xunit).
 pub fn create_reporter<'a, W: io::Write + 'a>(
     name: &str,
     writer: W,
@@ -28,6 +34,9 @@ pub fn create_reporter<'a, W: io::Write + 'a>(
         "min" => Ok(Box::new(MinReporter::new(writer, opts))),
         "list" => Ok(Box::new(ListReporter::new(writer, opts))),
         "tap" => Ok(Box::new(TapReporter::new(writer, opts))),
+        "json" => Ok(Box::new(JsonReporter::new(writer, opts))),
+        "json-stream" => Ok(Box::new(JsonStreamReporter::new(writer, opts))),
+        "xunit" | "junit" => Ok(Box::new(XUnitReporter::new(writer, opts))),
         other => Err(format!("Unknown reporter: {}", other)),
     }
 }
