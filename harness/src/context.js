@@ -105,7 +105,6 @@ function executeRunnable(fn, ctx, defaultTimeout = 2000) {
             reject(err);
           }
         }, ms);
-        if (timer.unref) timer.unref();
       }
     };
 

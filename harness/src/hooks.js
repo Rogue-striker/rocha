@@ -63,7 +63,6 @@ function runRunnable(fn, ctx, timeoutMs = 2000) {
           reject(err);
         }
       }, timeoutMs);
-      if (timer.unref) timer.unref();
     }
 
     const done = (err) => {
