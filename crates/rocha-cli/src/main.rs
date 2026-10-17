@@ -1,3 +1,33 @@
+fn verify_node_runtime(node_path: &Path) -> Result<(), String> {
+    let output = std::process::Command::new(node_path)
+        .arg("-v")
+        .output()
+        .map_err(|_| {
+            "Node.js runtime not found in PATH. Please install Node.js (>= 18.0.0).".to_string()
+        })?;
+
+    if !output.status.success() {
+        return Err("Node.js runtime returned failure on version check.".to_string());
+    }
+
+    let version_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let major = version_str
+        .trim_start_matches('v')
+        .split('.')
+        .next()
+        .and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(0);
+
+    if major < 18 {
+        return Err(format!(
+            "Node.js version {} is too old. Rocha requires Node.js >= 18.0.0.",
+            version_str
+        ));
+    }
+
+    Ok(())
+}
+
 mod args;
 mod compat;
 
@@ -52,7 +82,13 @@ async fn main() -> anyhow::Result<()> {
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let mut loader = ConfigLoader::new();
     let file_val = if let Some(ref cfg_path) = args.config {
-        loader.load_file(Path::new(cfg_path)).ok()
+        match loader.load_file(Path::new(cfg_path)) {
+            Ok(v) => Some(v),
+            Err(e) => {
+                eprintln!("Error: Cannot read config file \"{}\": {}", cfg_path, e);
+                std::process::exit(1);
+            }
+        }
     } else {
         loader.load_auto(&cwd).ok().flatten()
     };
@@ -73,7 +109,9 @@ async fn main() -> anyhow::Result<()> {
             }
         });
 
-    let harness_worker_path = project_root.join("harness/bin/worker.js");
+    let harness_worker_path = std::env::var("ROCHA_HARNESS_WORKER_PATH")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| project_root.join("harness/bin/worker.js"));
     let loader_path = project_root.join("loader/register.cjs");
 
     // 3. File discovery
@@ -112,7 +150,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let disc_opts = DiscoveryOptions {
-        specs,
+        specs: specs.clone(),
         extensions,
         recursive: args.recursive || config.recursive,
         sort: args.sort || config.sort,
@@ -123,11 +161,8 @@ async fn main() -> anyhow::Result<()> {
     let files = discover_files(&disc_opts).unwrap_or_default();
 
     if files.is_empty() {
-        if args.fail_zero || config.fail_zero {
-            eprintln!("Error: No test files found matching pattern and --fail-zero was specified");
-            std::process::exit(1);
-        }
-        std::process::exit(0);
+        eprintln!("Error: No test files found: \"{}\"", specs.join("\", \""));
+        std::process::exit(1);
     }
 
     // 4. Reporter setup
@@ -201,8 +236,33 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
+    let node_path = std::env::var("ROCHA_NODE_PATH")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("node"));
+
+    if let Err(e) = verify_node_runtime(&node_path) {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
+
+    for ldr in &loaders {
+        if (ldr.starts_with('.')
+            || ldr.starts_with('/')
+            || ldr.ends_with(".js")
+            || ldr.ends_with(".mjs")
+            || ldr.ends_with(".cjs"))
+            && !Path::new(ldr).exists()
+        {
+            eprintln!(
+                "Error: Failed to load custom loader \"{}\": File does not exist",
+                ldr
+            );
+            std::process::exit(1);
+        }
+    }
+
     let worker_config = WorkerConfig {
-        node_path: "node".into(),
+        node_path,
         loader_path: if loader_path.exists() {
             Some(loader_path)
         } else {
@@ -285,8 +345,8 @@ async fn main() -> anyhow::Result<()> {
     let scheduler = Scheduler::new(sched_config);
 
     // 7. Execute files through reporter pipeline
-    let summary = match create_reporter(reporter_name, std::io::stdout(), reporter_opts) {
-        Ok(mut rep) => scheduler.run_files(files, &mut rep).await?,
+    let run_res = match create_reporter(reporter_name, std::io::stdout(), reporter_opts) {
+        Ok(mut rep) => scheduler.run_files(files, &mut rep).await,
         Err(_) => {
             let mut reporter_options_map = HashMap::new();
             for opt in &combined_reporter_options {
@@ -300,7 +360,24 @@ async fn main() -> anyhow::Result<()> {
                 .map_err(|e| {
                     anyhow::anyhow!("Failed to instantiate reporter {}: {}", reporter_name, e)
                 })?;
-            scheduler.run_files(files, &mut bridge).await?
+            scheduler.run_files(files, &mut bridge).await
+        }
+    };
+
+    let summary = match run_res {
+        Ok(s) => s,
+        Err(e) => {
+            let err_msg = e.to_string();
+            if err_msg.contains("Protocol version mismatch") || err_msg.contains("VersionMismatch")
+            {
+                eprintln!(
+                    "Error: Protocol version mismatch between Rocha orchestrator and worker: {}",
+                    err_msg
+                );
+            } else {
+                eprintln!("Error: {}", err_msg);
+            }
+            std::process::exit(1);
         }
     };
 
