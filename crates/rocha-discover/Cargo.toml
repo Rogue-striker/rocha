@@ -8,3 +8,10 @@ license.workspace = true
 [dependencies]
 thiserror.workspace = true
 tracing.workspace = true
+globset = "0.4"
+walkdir = "2.5"
+rocha-config = { path = "../rocha-config" }
+
+[dev-dependencies]
+tempfile = "3.17"
+serde_json = "1.0"
