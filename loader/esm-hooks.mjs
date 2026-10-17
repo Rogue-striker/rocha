@@ -49,19 +49,25 @@ export function resolve(specifier, context, nextResolve) {
     }
   }
 
-  const resolved = nextResolve(specifier, context);
-  if (resolved && resolved.url && isTsUrl(resolved.url)) {
+  const markResolved = resolved => {
+    if (resolved && resolved.url && isTsUrl(resolved.url)) {
+      return {
+        url: resolved.url,
+        format: 'module',
+        shortCircuit: true,
+      };
+    }
+
     return {
-      url: resolved.url,
-      format: 'module',
+      ...resolved,
       shortCircuit: true,
     };
-  }
-
-  return {
-    ...resolved,
-    shortCircuit: true,
   };
+
+  const resolved = nextResolve(specifier, context);
+  return resolved && typeof resolved.then === 'function'
+    ? resolved.then(markResolved)
+    : markResolved(resolved);
 }
 
 export function load(url, context, nextLoad) {
