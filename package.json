@@ -5,7 +5,7 @@
   "main": "index.js",
   "types": "index.d.ts",
   "bin": {
-    "rocha": "./bin/rocha"
+    "rocha": "bin/rocha"
   },
   "scripts": {
     "postinstall": "node scripts/install-binary.js",
