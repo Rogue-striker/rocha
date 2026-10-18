@@ -1,17 +1,24 @@
 #!/usr/bin/env node
 'use strict';
 
+const fs = require('fs');
 const { spawnSync } = require('child_process');
 const { getBinaryPath, ensureBinary } = require('../scripts/install-binary');
 
 let binPath = getBinaryPath();
-if (!binPath) {
+if (!binPath || !fs.existsSync(binPath)) {
   try {
     binPath = ensureBinary();
   } catch (err) {
-    console.error(`Error resolving rocha binary: ${err.message}`);
+    console.error(`Error resolving rocha binary:\n${err.message}`);
     process.exit(1);
   }
+}
+
+if (!binPath || !fs.existsSync(binPath)) {
+  console.error(`Error: Rocha native binary could not be found at "${binPath}".`);
+  console.error(`Please set the ROCHA_BINARY_PATH environment variable to your compiled binary.`);
+  process.exit(1);
 }
 
 const result = spawnSync(binPath, process.argv.slice(2), {

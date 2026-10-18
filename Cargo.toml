@@ -13,11 +13,11 @@ members = [
 ]
 
 [workspace.package]
-version = "2.5.11"
+version = "2.5.12"
 edition = "2021"
 authors = ["rogue-striker"]
 license = "MIT"
-repository = "https://github.com/rocha-runner/rocha"
+repository = "https://github.com/Rogue-striker/rocha"
 
 [workspace.dependencies]
 thiserror = "2.0"

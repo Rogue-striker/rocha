@@ -3,3 +3,5 @@ node_modules/
 .rocha/
 .DS_Store
 *.log
+/bin/rocha-native*
+/vendor/

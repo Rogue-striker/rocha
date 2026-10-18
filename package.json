@@ -1,6 +1,6 @@
 {
   "name": "@rogue-striker/rocha",
-  "version": "2.5.11",
+  "version": "2.5.12",
   "publishConfig": {
     "access": "public"
   },
@@ -11,6 +11,7 @@
     "rocha": "bin/rocha"
   },
   "scripts": {
+    "prepack": "node scripts/install-binary.js --prep",
     "postinstall": "node scripts/install-binary.js",
     "test": "node --test harness/test/*.test.js"
   },
@@ -39,6 +40,8 @@
   },
   "files": [
     "bin/rocha",
+    "bin/rocha-native*",
+    "vendor/**",
     "index.js",
     "index.d.ts",
     "harness/bin",

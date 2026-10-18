@@ -2,12 +2,24 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const crypto = require('crypto');
 const https = require('https');
 const { execSync } = require('child_process');
 
 const PKG_ROOT = path.resolve(__dirname, '..');
 const CHECKSUMS_PATH = path.join(__dirname, 'checksums.json');
+const PKG_JSON_PATH = path.join(PKG_ROOT, 'package.json');
+
+function getPackageVersion() {
+  try {
+    if (fs.existsSync(PKG_JSON_PATH)) {
+      const pkg = JSON.parse(fs.readFileSync(PKG_JSON_PATH, 'utf8'));
+      if (pkg.version) return pkg.version;
+    }
+  } catch (_) {}
+  return '2.5.12';
+}
 
 function getTargetTriple(platform = process.platform, arch = process.arch) {
   if (platform === 'darwin') {
@@ -38,7 +50,7 @@ function getBinaryPath() {
     return nativeBin;
   }
 
-  // 2. Check vendor package directory
+  // 2. Check vendor package directory for exact target match
   try {
     const target = getTargetTriple();
     const vendorBin = path.join(PKG_ROOT, 'vendor', target, binaryName);
@@ -46,7 +58,7 @@ function getBinaryPath() {
       return vendorBin;
     }
   } catch (_) {
-    // Ignore unsupported target during simple check
+    // Unsupported platform during simple probe
   }
 
   // 3. Check local release/debug builds (development workspace)
@@ -74,6 +86,21 @@ function verifyChecksum(buffer, expectedHex) {
   return true;
 }
 
+function findFileRecursive(dir, filename) {
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isFile() && entry.name === filename) {
+      return fullPath;
+    }
+    if (entry.isDirectory()) {
+      const found = findFileRecursive(fullPath, filename);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 function downloadBinary(target, nativeBin) {
   const binaryName = getBinaryName();
   let manifest = {};
@@ -84,53 +111,91 @@ function downloadBinary(target, nativeBin) {
   }
 
   const targetInfo = manifest.targets && manifest.targets[target];
-  const version = manifest.version || '0.1.0';
-  const archiveName = targetInfo ? targetInfo.archive : `rocha-v${version}-${target}.tar.gz`;
+  const version = manifest.version || getPackageVersion();
+  const archiveName = targetInfo ? targetInfo.archive : `rocha-v${version}-${target}.${process.platform === 'win32' ? 'zip' : 'tar.gz'}`;
   const url = `https://github.com/Rogue-striker/rocha/releases/download/v${version}/${archiveName}`;
 
   console.log(`Downloading Rocha native binary from ${url}...`);
-  const tmpArchive = path.join(path.dirname(nativeBin), archiveName);
 
-  return new Promise((resolve, reject) => {
-    function fetchUrl(targetUrl) {
-      https.get(targetUrl, (res) => {
-        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          return fetchUrl(res.headers.location);
-        }
-        if (res.statusCode !== 200) {
-          return reject(new Error(`HTTP ${res.statusCode} downloading ${targetUrl}`));
-        }
-        const fileStream = fs.createWriteStream(tmpArchive);
-        res.pipe(fileStream);
-        fileStream.on('finish', () => {
-          fileStream.close();
-          try {
-            const buf = fs.readFileSync(tmpArchive);
-            if (targetInfo && targetInfo.sha256) {
-              verifyChecksum(buf, targetInfo.sha256);
+  fs.mkdirSync(path.dirname(nativeBin), { recursive: true });
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rocha-dl-'));
+  const tmpArchive = path.join(tmpDir, archiveName);
+
+  // Attempt download using curl first (built into macOS, Linux, and Windows 10+)
+  let downloaded = false;
+  try {
+    execSync(`curl -fLsS "${url}" -o "${tmpArchive}"`, { stdio: 'inherit' });
+    downloaded = fs.existsSync(tmpArchive) && fs.statSync(tmpArchive).size > 0;
+  } catch (_) {
+    downloaded = false;
+  }
+
+  // Fallback to Node.js https if curl is unavailable or failed
+  const fetchPromise = downloaded
+    ? Promise.resolve()
+    : new Promise((resolve, reject) => {
+        function fetchUrl(targetUrl, redirects = 0) {
+          if (redirects > 5) return reject(new Error('Too many redirects'));
+          https.get(targetUrl, (res) => {
+            if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+              return fetchUrl(res.headers.location, redirects + 1);
             }
-            // Extract archive
-            if (process.platform === 'win32') {
-              execSync(`tar -xf "${tmpArchive}" -C "${path.dirname(nativeBin)}"`);
-            } else {
-              execSync(`tar -xzf "${tmpArchive}" -C "${path.dirname(nativeBin)}"`);
-              fs.chmodSync(nativeBin, 0o755);
+            if (res.statusCode !== 200) {
+              return reject(new Error(`HTTP ${res.statusCode} downloading ${targetUrl}`));
             }
-            fs.unlinkSync(tmpArchive);
-            resolve(nativeBin);
-          } catch (err) {
-            reject(err);
-          }
-        });
-      }).on('error', reject);
+            const fileStream = fs.createWriteStream(tmpArchive);
+            res.pipe(fileStream);
+            fileStream.on('finish', () => {
+              fileStream.close();
+              resolve();
+            });
+            fileStream.on('error', reject);
+          }).on('error', reject);
+        }
+        fetchUrl(url);
+      });
+
+  return fetchPromise.then(() => {
+    const buf = fs.readFileSync(tmpArchive);
+    if (targetInfo && targetInfo.sha256) {
+      verifyChecksum(buf, targetInfo.sha256);
     }
-    fetchUrl(url);
+
+    const extractDir = path.join(tmpDir, 'extracted');
+    fs.mkdirSync(extractDir, { recursive: true });
+
+    if (archiveName.endsWith('.zip')) {
+      try {
+        execSync(`tar -xf "${tmpArchive}" -C "${extractDir}"`);
+      } catch (_) {
+        execSync(`powershell -command "Expand-Archive -Path '${tmpArchive}' -DestinationPath '${extractDir}' -Force"`);
+      }
+    } else {
+      execSync(`tar -xzf "${tmpArchive}" -C "${extractDir}"`);
+    }
+
+    const extractedBinary = findFileRecursive(extractDir, binaryName);
+    if (!extractedBinary) {
+      throw new Error(`Archive ${archiveName} did not contain executable '${binaryName}'`);
+    }
+
+    fs.copyFileSync(extractedBinary, nativeBin);
+    if (process.platform !== 'win32') {
+      fs.chmodSync(nativeBin, 0o755);
+    }
+
+    // Clean up
+    try {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } catch (_) {}
+
+    return nativeBin;
   });
 }
 
 function ensureBinary() {
   let existing = getBinaryPath();
-  if (existing) {
+  if (existing && fs.existsSync(existing)) {
     return existing;
   }
 
@@ -138,7 +203,22 @@ function ensureBinary() {
   const binaryName = getBinaryName();
   const nativeBin = path.join(PKG_ROOT, 'bin', 'rocha-native' + (process.platform === 'win32' ? '.exe' : ''));
 
-  // If local Cargo.toml exists, build release binary
+  // 1. Check if matching pre-bundled vendor binary exists
+  const vendorBin = path.join(PKG_ROOT, 'vendor', target, binaryName);
+  if (fs.existsSync(vendorBin)) {
+    try {
+      fs.mkdirSync(path.dirname(nativeBin), { recursive: true });
+      fs.copyFileSync(vendorBin, nativeBin);
+      if (process.platform !== 'win32') {
+        fs.chmodSync(nativeBin, 0o755);
+      }
+      return nativeBin;
+    } catch (_) {
+      return vendorBin;
+    }
+  }
+
+  // 2. If Cargo.toml exists, build release binary locally
   const cargoToml = path.join(PKG_ROOT, 'Cargo.toml');
   if (fs.existsSync(cargoToml)) {
     try {
@@ -150,6 +230,7 @@ function ensureBinary() {
       const builtBin = path.join(PKG_ROOT, 'target', 'release', binaryName);
       if (fs.existsSync(builtBin)) {
         try {
+          fs.mkdirSync(path.dirname(nativeBin), { recursive: true });
           fs.copyFileSync(builtBin, nativeBin);
           if (process.platform !== 'win32') {
             fs.chmodSync(nativeBin, 0o755);
@@ -164,15 +245,110 @@ function ensureBinary() {
     }
   }
 
+  // 3. Try to download from GitHub Releases
+  try {
+    downloadBinarySync(target, nativeBin);
+    if (fs.existsSync(nativeBin)) {
+      return nativeBin;
+    }
+  } catch (err) {
+    console.warn(`Failed to download prebuilt binary: ${err.message}`);
+  }
+
+  throw new Error(
+    `Rocha native binary could not be found or downloaded for target '${target}'.\n` +
+    `Please set the ROCHA_BINARY_PATH environment variable to your compiled binary, or check https://github.com/Rogue-striker/rocha/releases.`
+  );
+}
+
+function downloadBinarySync(target, nativeBin) {
+  const binaryName = getBinaryName();
+  let manifest = {};
+  if (fs.existsSync(CHECKSUMS_PATH)) {
+    try {
+      manifest = JSON.parse(fs.readFileSync(CHECKSUMS_PATH, 'utf8'));
+    } catch (_) {}
+  }
+
+  const targetInfo = manifest.targets && manifest.targets[target];
+  const version = manifest.version || getPackageVersion();
+  const archiveName = targetInfo ? targetInfo.archive : `rocha-v${version}-${target}.${process.platform === 'win32' ? 'zip' : 'tar.gz'}`;
+  const url = `https://github.com/Rogue-striker/rocha/releases/download/v${version}/${archiveName}`;
+
+  console.log(`Downloading Rocha native binary from ${url}...`);
+
+  fs.mkdirSync(path.dirname(nativeBin), { recursive: true });
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rocha-dl-'));
+  const tmpArchive = path.join(tmpDir, archiveName);
+
+  execSync(`curl -fLsS "${url}" -o "${tmpArchive}"`, { stdio: 'inherit' });
+
+  const extractDir = path.join(tmpDir, 'extracted');
+  fs.mkdirSync(extractDir, { recursive: true });
+
+  if (archiveName.endsWith('.zip')) {
+    try {
+      execSync(`tar -xf "${tmpArchive}" -C "${extractDir}"`);
+    } catch (_) {
+      execSync(`powershell -command "Expand-Archive -Path '${tmpArchive}' -DestinationPath '${extractDir}' -Force"`);
+    }
+  } else {
+    execSync(`tar -xzf "${tmpArchive}" -C "${extractDir}"`);
+  }
+
+  const extractedBinary = findFileRecursive(extractDir, binaryName);
+  if (!extractedBinary) {
+    throw new Error(`Archive ${archiveName} did not contain executable '${binaryName}'`);
+  }
+
+  fs.copyFileSync(extractedBinary, nativeBin);
+  if (process.platform !== 'win32') {
+    fs.chmodSync(nativeBin, 0o755);
+  }
+
+  try {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  } catch (_) {}
+
   return nativeBin;
 }
 
+function stagePrebuiltVendor() {
+  const target = getTargetTriple();
+  const binaryName = getBinaryName();
+  const vendorTargetDir = path.join(PKG_ROOT, 'vendor', target);
+  const targetBin = path.join(vendorTargetDir, binaryName);
+
+  // If already exists, we are good
+  if (fs.existsSync(targetBin)) {
+    console.log(`Prebuilt vendor binary present at: ${targetBin}`);
+    return;
+  }
+
+  // Look for target/release/rocha
+  const releaseBin = path.join(PKG_ROOT, 'target', 'release', binaryName);
+  if (fs.existsSync(releaseBin)) {
+    fs.mkdirSync(vendorTargetDir, { recursive: true });
+    fs.copyFileSync(releaseBin, targetBin);
+    if (process.platform !== 'win32') {
+      try { execSync(`strip "${targetBin}"`); } catch (_) {}
+      fs.chmodSync(targetBin, 0o755);
+    }
+    console.log(`Staged vendor binary at: ${targetBin}`);
+  }
+}
+
 if (require.main === module) {
-  try {
-    const bin = ensureBinary();
-    console.log(`Rocha native binary ready at: ${bin}`);
-  } catch (err) {
-    console.warn(`Postinstall notice: ${err.message}`);
+  const isPrep = process.argv.includes('--prep');
+  if (isPrep) {
+    stagePrebuiltVendor();
+  } else {
+    try {
+      const bin = ensureBinary();
+      console.log(`Rocha native binary ready at: ${bin}`);
+    } catch (err) {
+      console.warn(`Postinstall notice: ${err.message}`);
+    }
   }
 }
 
@@ -181,5 +357,6 @@ module.exports = {
   getBinaryName,
   getBinaryPath,
   verifyChecksum,
+  downloadBinary,
   ensureBinary,
 };
