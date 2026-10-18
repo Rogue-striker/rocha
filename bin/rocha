@@ -21,9 +21,16 @@ if (!binPath || !fs.existsSync(binPath)) {
   process.exit(1);
 }
 
+const path = require('path');
+const PKG_ROOT = path.resolve(__dirname, '..');
+
 const result = spawnSync(binPath, process.argv.slice(2), {
   stdio: 'inherit',
-  env: process.env,
+  env: {
+    ...process.env,
+    ROCHA_PROJECT_ROOT: process.env.ROCHA_PROJECT_ROOT || PKG_ROOT,
+    ROCHA_HARNESS_WORKER_PATH: process.env.ROCHA_HARNESS_WORKER_PATH || path.join(PKG_ROOT, 'harness', 'bin', 'worker.js'),
+  },
 });
 
 if (result.error) {

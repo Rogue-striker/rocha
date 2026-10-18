@@ -48,6 +48,39 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+fn find_rocha_assets_root(cwd: &Path) -> PathBuf {
+    if let Ok(val) = std::env::var("ROCHA_PROJECT_ROOT") {
+        let p = PathBuf::from(val);
+        if p.join("harness/bin/worker.js").exists() {
+            return p;
+        }
+    }
+    // Check relative to current executable (e.g. <pkg>/bin/rocha-native -> <pkg>)
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(bin_dir) = exe.parent() {
+            if let Some(pkg_dir) = bin_dir.parent() {
+                if pkg_dir.join("harness/bin/worker.js").exists() {
+                    return pkg_dir.to_path_buf();
+                }
+            }
+        }
+    }
+    // Check cwd/node_modules/@rogue-striker/rocha/
+    let nm_pkg = cwd.join("node_modules/@rogue-striker/rocha");
+    if nm_pkg.join("harness/bin/worker.js").exists() {
+        return nm_pkg;
+    }
+    // Check cwd
+    if cwd.join("harness/bin/worker.js").exists() {
+        return cwd.to_path_buf();
+    }
+    // Check cwd/../../
+    if cwd.join("../../harness/bin/worker.js").exists() {
+        return cwd.join("../..");
+    }
+    cwd.to_path_buf()
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let total_start = std::time::Instant::now();
@@ -55,17 +88,7 @@ async fn main() -> anyhow::Result<()> {
     let args = CliArgs::parse();
 
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let project_root = std::env::var("ROCHA_PROJECT_ROOT")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| {
-            if cwd.join("harness/bin/worker.js").exists() {
-                cwd.clone()
-            } else if cwd.join("../../harness/bin/worker.js").exists() {
-                cwd.join("../..")
-            } else {
-                cwd.clone()
-            }
-        });
+    let project_root = find_rocha_assets_root(&cwd);
 
     if args.doctor {
         doctor::run_doctor(&project_root, args.config.as_deref())?;
@@ -121,17 +144,7 @@ async fn main() -> anyhow::Result<()> {
     let config = resolve_config(file_val, &env_vars, Some(overrides)).unwrap_or_default();
 
     // 2. Locate workspace root and harness assets
-    let project_root = std::env::var("ROCHA_PROJECT_ROOT")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| {
-            if cwd.join("harness/bin/worker.js").exists() {
-                cwd.clone()
-            } else if cwd.join("../../harness/bin/worker.js").exists() {
-                cwd.join("../..")
-            } else {
-                cwd.clone()
-            }
-        });
+    let project_root = find_rocha_assets_root(&cwd);
 
     let harness_worker_path = std::env::var("ROCHA_HARNESS_WORKER_PATH")
         .map(PathBuf::from)
