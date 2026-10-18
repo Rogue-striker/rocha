@@ -85,7 +85,7 @@ impl Default for SchedulerConfig {
 
         Self {
             jobs,
-            isolate: IsolationMode::File,
+            isolate: IsolationMode::None,
             worker_config: WorkerConfig::default(),
             run_options: RunFileOptions::default(),
             file_timeout: derive_file_timeout(None, None),

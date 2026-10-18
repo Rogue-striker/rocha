@@ -311,15 +311,27 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // 6. Scheduler configuration
-    let jobs = if args.parallel || config.parallel {
-        args.jobs.unwrap_or(config.jobs)
+    let default_parallel_cpus = std::thread::available_parallelism()
+        .map(|p| p.get())
+        .unwrap_or(4)
+        .saturating_sub(1)
+        .max(2);
+
+    let jobs = if let Some(j) = args.jobs {
+        j
+    } else if args.parallel || config.parallel {
+        if config.jobs > 1 {
+            config.jobs
+        } else {
+            default_parallel_cpus
+        }
     } else {
-        args.jobs.unwrap_or(1)
+        1
     };
 
     let isolate = match args.isolate.as_deref() {
-        Some("none") => IsolationMode::None,
-        _ => IsolationMode::File,
+        Some("file") => IsolationMode::File,
+        _ => IsolationMode::None,
     };
 
     let shard = args

@@ -314,28 +314,77 @@ function downloadBinarySync(target, nativeBin) {
 }
 
 function stagePrebuiltVendor() {
-  const target = getTargetTriple();
   const binaryName = getBinaryName();
-  const vendorTargetDir = path.join(PKG_ROOT, 'vendor', target);
-  const targetBin = path.join(vendorTargetDir, binaryName);
 
-  // If already exists, we are good
-  if (fs.existsSync(targetBin)) {
-    console.log(`Prebuilt vendor binary present at: ${targetBin}`);
-    return;
-  }
+  // If dist-artifacts exists (e.g. CI workflow after building target matrices), unpack all targets and update checksums
+  const distArtifactsDir = path.join(PKG_ROOT, 'dist-artifacts');
+  if (fs.existsSync(distArtifactsDir)) {
+    try {
+      let manifest = {};
+      if (fs.existsSync(CHECKSUMS_PATH)) {
+        manifest = JSON.parse(fs.readFileSync(CHECKSUMS_PATH, 'utf8'));
+      }
+      if (manifest.targets) {
+        for (const [t, info] of Object.entries(manifest.targets)) {
+          const archivePath = path.join(distArtifactsDir, info.archive);
+          if (fs.existsSync(archivePath)) {
+            const archiveBuf = fs.readFileSync(archivePath);
+            info.sha256 = crypto.createHash('sha256').update(archiveBuf).digest('hex');
 
-  // Look for target/release/rocha
-  const releaseBin = path.join(PKG_ROOT, 'target', 'release', binaryName);
-  if (fs.existsSync(releaseBin)) {
-    fs.mkdirSync(vendorTargetDir, { recursive: true });
-    fs.copyFileSync(releaseBin, targetBin);
-    if (process.platform !== 'win32') {
-      try { execSync(`strip "${targetBin}"`); } catch (_) {}
-      fs.chmodSync(targetBin, 0o755);
+            const vendorTargetDir = path.join(PKG_ROOT, 'vendor', t);
+            fs.mkdirSync(vendorTargetDir, { recursive: true });
+            const extractDir = path.join(vendorTargetDir, '_extract');
+            fs.mkdirSync(extractDir, { recursive: true });
+
+            if (info.archive.endsWith('.zip')) {
+              try {
+                execSync(`tar -xf "${archivePath}" -C "${extractDir}"`);
+              } catch (_) {
+                execSync(`powershell -command "Expand-Archive -Path '${archivePath}' -DestinationPath '${extractDir}' -Force"`);
+              }
+            } else {
+              execSync(`tar -xzf "${archivePath}" -C "${extractDir}"`);
+            }
+
+            const binFile = findFileRecursive(extractDir, info.binary || binaryName);
+            if (binFile) {
+              const destBin = path.join(vendorTargetDir, info.binary || binaryName);
+              fs.copyFileSync(binFile, destBin);
+              if (!destBin.endsWith('.exe')) {
+                try { execSync(`strip "${destBin}"`); } catch (_) {}
+                fs.chmodSync(destBin, 0o755);
+              }
+            }
+            try { fs.rmSync(extractDir, { recursive: true, force: true }); } catch (_) {}
+          }
+        }
+        fs.writeFileSync(CHECKSUMS_PATH, JSON.stringify(manifest, null, 2) + '\n');
+        console.log(`Updated ${CHECKSUMS_PATH} and staged multi-platform vendor binaries from dist-artifacts.`);
+      }
+    } catch (err) {
+      console.warn(`Warning: failed to process dist-artifacts: ${err.message}`);
     }
-    console.log(`Staged vendor binary at: ${targetBin}`);
   }
+
+  // Also stage current target if release binary exists locally
+  try {
+    const target = getTargetTriple();
+    const vendorTargetDir = path.join(PKG_ROOT, 'vendor', target);
+    const targetBin = path.join(vendorTargetDir, binaryName);
+
+    if (!fs.existsSync(targetBin)) {
+      const releaseBin = path.join(PKG_ROOT, 'target', 'release', binaryName);
+      if (fs.existsSync(releaseBin)) {
+        fs.mkdirSync(vendorTargetDir, { recursive: true });
+        fs.copyFileSync(releaseBin, targetBin);
+        if (process.platform !== 'win32') {
+          try { execSync(`strip "${targetBin}"`); } catch (_) {}
+          fs.chmodSync(targetBin, 0o755);
+        }
+        console.log(`Staged vendor binary at: ${targetBin}`);
+      }
+    }
+  } catch (_) {}
 }
 
 if (require.main === module) {
