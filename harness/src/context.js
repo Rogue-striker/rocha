@@ -112,8 +112,6 @@ function executeRunnable(fn, ctx, defaultTimeout = 2000) {
       ctx._rescheduleTimer = scheduleTimer;
     }
 
-    scheduleTimer(getTimeout());
-
     const onUncaught = (err) => {
       if (!settled) {
         settled = true;
@@ -161,6 +159,7 @@ function executeRunnable(fn, ctx, defaultTimeout = 2000) {
 
     try {
       if (fn.length > 0) {
+        scheduleTimer(getTimeout());
         // Callback style with done(err)
         const result = fn.call(ctx, done);
         if (result && typeof result.then === "function") {
@@ -172,6 +171,7 @@ function executeRunnable(fn, ctx, defaultTimeout = 2000) {
         // Sync or returning Promise
         const result = fn.call(ctx);
         if (result && typeof result.then === "function") {
+          scheduleTimer(getTimeout());
           result.then(
             (val) => {
               if (settled) return;

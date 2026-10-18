@@ -43,12 +43,14 @@ const LogStream = {
  */
 function encodeFrame(message) {
   const payload = encode(message);
-  if (payload.byteLength > MAX_FRAME_SIZE) {
-    throw new Error(`Frame payload size ${payload.byteLength} exceeds MAX_FRAME_SIZE ${MAX_FRAME_SIZE}`);
+  const len = payload.byteLength;
+  if (len > MAX_FRAME_SIZE) {
+    throw new Error(`Frame payload size ${len} exceeds MAX_FRAME_SIZE ${MAX_FRAME_SIZE}`);
   }
-  const header = Buffer.allocUnsafe(4);
-  header.writeUInt32LE(payload.byteLength, 0);
-  return Buffer.concat([header, Buffer.from(payload.buffer, payload.byteOffset, payload.byteLength)]);
+  const frame = Buffer.allocUnsafe(4 + len);
+  frame.writeUInt32LE(len, 0);
+  frame.set(payload, 4);
+  return frame;
 }
 
 /**
@@ -93,8 +95,16 @@ class BatchEmitter {
     const items = this.queue;
     this.queue = [];
 
-    const chunks = items.map(msg => encodeFrame(msg));
-    const combined = chunks.length === 1 ? chunks[0] : Buffer.concat(chunks);
+    const len = items.length;
+    const chunks = new Array(len);
+    let totalLen = 0;
+    for (let i = 0; i < len; i++) {
+      const frame = encodeFrame(items[i]);
+      chunks[i] = frame;
+      totalLen += frame.length;
+    }
+
+    const combined = len === 1 ? chunks[0] : Buffer.concat(chunks, totalLen);
 
     if (this.stream) {
       if (typeof this.stream.write === 'function') {

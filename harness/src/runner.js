@@ -255,6 +255,9 @@ class Runner extends EventEmitter {
 
     // 2. If beforeAll hooks succeeded and suite wasn't skipped, run tests and child suites
     if (!suiteAborted && !suiteSkipped && !this._bailed) {
+      const beforeEachHooks = collectBeforeEachHooks({ suite });
+      const afterEachHooks = collectAfterEachHooks({ suite });
+
       for (const test of suite.tests) {
         if (this._bailed || suiteAborted) break;
 
@@ -317,7 +320,8 @@ class Runner extends EventEmitter {
 
         while (true) {
           stepFailed = false;
-          const testContext = Object.create(suiteContext);
+          const testContext = new Context(test);
+          Object.assign(testContext, suiteContext);
           testContext.test = test;
           testContext._runnable = test;
           testContext.allowUncaught = this.options.allowUncaught;
@@ -327,29 +331,6 @@ class Runner extends EventEmitter {
             ? suiteContext._retries 
             : (typeof test.retries === "number" && test.retries > 0 ? test.retries : (this.options.retries || 0));
           testContext._currentRetry = attempt;
-          testContext.timeout = function(ms) {
-            if (!arguments.length) return this._timeout !== null && this._timeout !== undefined ? this._timeout : 2000;
-            this._timeout = Number(ms);
-            if (this.test && typeof this.test.timeout === "function") this.test.timeout(this._timeout);
-            if (typeof this._rescheduleTimer === "function") {
-              this._rescheduleTimer(this._timeout);
-            }
-            return this;
-          };
-          testContext.slow = function(ms) {
-            if (!arguments.length) return this._slow !== null && this._slow !== undefined ? this._slow : 75;
-            this._slow = Number(ms);
-            if (this.test && typeof this.test.slow === "function") this.test.slow(this._slow);
-            return this;
-          };
-          testContext.retries = function(n) {
-            if (!arguments.length) return this._retries !== null && this._retries !== undefined ? this._retries : 0;
-            this._retries = Number(n);
-            if (this.test && typeof this.test.retries === "function") this.test.retries(this._retries);
-            return this;
-          };
-          testContext.currentRetry = function(n) { if (!arguments.length) return this._currentRetry; this._currentRetry = Number(n); return this; };
-          testContext.skip = function() { throw new PendingError("sync skip; aborting execution"); };
           testContext.onMultipleDone = (multiErr) => {
             this.stats.failures++;
             this.failures.push({
@@ -362,9 +343,6 @@ class Runner extends EventEmitter {
             this.emit("fail", test, multiErr);
             if (this.options.bail || suite._bail) this._bailed = true;
           };
-
-          const beforeEachHooks = collectBeforeEachHooks(test);
-          const afterEachHooks = collectAfterEachHooks(test);
 
           let stepErr = null;
 
