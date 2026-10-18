@@ -69,42 +69,36 @@ function cleanError(err) {
   return res;
 }
 
-/**
- * Execute a runnable with advanced async, done callback, promise, timeout, and uncaught tracking.
- */
-function executeRunnable(fn, ctx, defaultTimeout = 2000) {
+function executeAsyncPromise(promise, ctx, defaultTimeout) {
   return new Promise((resolve, reject) => {
     let settled = false;
     let timer = null;
-    let doneCallCount = 0;
 
-    const getTimeout = () => {
-      if (ctx && typeof ctx._timeout === "number") {
-        return ctx._timeout;
+    const ms = (ctx && typeof ctx._timeout === "number") ? ctx._timeout : (defaultTimeout !== undefined ? defaultTimeout : 2000);
+
+    const cleanup = () => {
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (!ctx || !ctx.allowUncaught) {
+        process.removeListener("uncaughtException", onUncaught);
+        process.removeListener("unhandledRejection", onUnhandledRejection);
       }
-      return defaultTimeout !== undefined ? defaultTimeout : 2000;
-    };
-
-    const cleanupListeners = () => {
-      process.removeListener("uncaughtException", onUncaught);
-      process.removeListener("unhandledRejection", onUnhandledRejection);
       if (ctx) ctx._rescheduleTimer = null;
     };
 
-    const scheduleTimer = (ms) => {
+    const scheduleTimer = (timeoutMs) => {
       if (timer) clearTimeout(timer);
-      if (ms > 0 && ms !== Infinity) {
+      if (timeoutMs > 0 && timeoutMs !== Infinity) {
         timer = setTimeout(() => {
           if (!settled) {
             settled = true;
-            cleanupListeners();
+            cleanup();
             const title = ctx && ctx.test ? ctx.test.fullTitle() : "runnable";
             const file = ctx && ctx.test && ctx.test.file ? ` (${ctx.test.file})` : "";
-            const err = new Error(`Timeout of ${ms}ms exceeded. For async tests and hooks, ensure \"done()\" is called; if returning a Promise, ensure it resolves.${file}`);
+            const err = new Error(`Timeout of ${timeoutMs}ms exceeded. For async tests and hooks, ensure "done()" is called; if returning a Promise, ensure it resolves.${file}`);
             err.code = "ERR_MOCHA_TIMEOUT";
             reject(err);
           }
-        }, ms);
+        }, timeoutMs);
       }
     };
 
@@ -115,8 +109,7 @@ function executeRunnable(fn, ctx, defaultTimeout = 2000) {
     const onUncaught = (err) => {
       if (!settled) {
         settled = true;
-        cleanupListeners();
-        if (timer) clearTimeout(timer);
+        cleanup();
         reject(err);
       }
     };
@@ -131,6 +124,83 @@ function executeRunnable(fn, ctx, defaultTimeout = 2000) {
       process.prependListener("unhandledRejection", onUnhandledRejection);
     }
 
+    scheduleTimer(ms);
+
+    promise.then(
+      (val) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(val);
+      },
+      (err) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(err);
+      }
+    );
+  });
+}
+
+function executeAsyncCallback(fn, ctx, defaultTimeout) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let timer = null;
+    let doneCallCount = 0;
+
+    const ms = (ctx && typeof ctx._timeout === "number") ? ctx._timeout : (defaultTimeout !== undefined ? defaultTimeout : 2000);
+
+    const cleanup = () => {
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (!ctx || !ctx.allowUncaught) {
+        process.removeListener("uncaughtException", onUncaught);
+        process.removeListener("unhandledRejection", onUnhandledRejection);
+      }
+      if (ctx) ctx._rescheduleTimer = null;
+    };
+
+    const scheduleTimer = (timeoutMs) => {
+      if (timer) clearTimeout(timer);
+      if (timeoutMs > 0 && timeoutMs !== Infinity) {
+        timer = setTimeout(() => {
+          if (!settled) {
+            settled = true;
+            cleanup();
+            const title = ctx && ctx.test ? ctx.test.fullTitle() : "runnable";
+            const file = ctx && ctx.test && ctx.test.file ? ` (${ctx.test.file})` : "";
+            const err = new Error(`Timeout of ${timeoutMs}ms exceeded. For async tests and hooks, ensure "done()" is called; if returning a Promise, ensure it resolves.${file}`);
+            err.code = "ERR_MOCHA_TIMEOUT";
+            reject(err);
+          }
+        }, timeoutMs);
+      }
+    };
+
+    if (ctx) {
+      ctx._rescheduleTimer = scheduleTimer;
+    }
+
+    const onUncaught = (err) => {
+      if (!settled) {
+        settled = true;
+        cleanup();
+        reject(err);
+      }
+    };
+
+    const onUnhandledRejection = (reason) => {
+      const err = reason instanceof Error ? reason : new Error(String(reason));
+      onUncaught(err);
+    };
+
+    if (!ctx || !ctx.allowUncaught) {
+      process.prependListener("uncaughtException", onUncaught);
+      process.prependListener("unhandledRejection", onUnhandledRejection);
+    }
+
+    scheduleTimer(ms);
+
     const done = (err) => {
       doneCallCount++;
       if (doneCallCount > 1) {
@@ -142,8 +212,7 @@ function executeRunnable(fn, ctx, defaultTimeout = 2000) {
           ctx.onMultipleDone(multiErr);
         } else if (!settled) {
           settled = true;
-          cleanupListeners();
-          if (timer) clearTimeout(timer);
+          cleanup();
           reject(multiErr);
         }
         return;
@@ -151,59 +220,48 @@ function executeRunnable(fn, ctx, defaultTimeout = 2000) {
 
       if (settled) return;
       settled = true;
-      cleanupListeners();
-      if (timer) clearTimeout(timer);
+      cleanup();
       if (err) reject(err);
       else resolve();
     };
 
     try {
-      if (fn.length > 0) {
-        scheduleTimer(getTimeout());
-        // Callback style with done(err)
-        const result = fn.call(ctx, done);
-        if (result && typeof result.then === "function") {
-          const overErr = new Error("Resolution method is overspecified. Specify a callback *or* return a Promise; not both.");
-          overErr.code = "ERR_MOCHA_OVER_SPECIFIED_TEST";
-          done(overErr);
-        }
-      } else {
-        // Sync or returning Promise
-        const result = fn.call(ctx);
-        if (result && typeof result.then === "function") {
-          scheduleTimer(getTimeout());
-          result.then(
-            (val) => {
-              if (settled) return;
-              settled = true;
-              cleanupListeners();
-              if (timer) clearTimeout(timer);
-              resolve(val);
-            },
-            (err) => {
-              if (settled) return;
-              settled = true;
-              cleanupListeners();
-              if (timer) clearTimeout(timer);
-              reject(err);
-            }
-          );
-        } else {
-          settled = true;
-          cleanupListeners();
-          if (timer) clearTimeout(timer);
-          resolve(result);
-        }
+      const result = fn.call(ctx, done);
+      if (result && typeof result.then === "function") {
+        const overErr = new Error("Resolution method is overspecified. Specify a callback *or* return a Promise; not both.");
+        overErr.code = "ERR_MOCHA_OVER_SPECIFIED_TEST";
+        done(overErr);
       }
     } catch (err) {
       if (!settled) {
         settled = true;
-        cleanupListeners();
-        if (timer) clearTimeout(timer);
+        cleanup();
         reject(err);
       }
     }
   });
+}
+
+/**
+ * Execute a runnable with advanced async, done callback, promise, timeout, and uncaught tracking.
+ */
+function executeRunnable(fn, ctx, defaultTimeout = 2000) {
+  if (typeof fn !== "function") return;
+
+  if (fn.length === 0) {
+    let result;
+    try {
+      result = fn.call(ctx);
+    } catch (err) {
+      return Promise.reject(err);
+    }
+    if (!result || typeof result.then !== "function") {
+      return result;
+    }
+    return executeAsyncPromise(result, ctx, defaultTimeout);
+  }
+
+  return executeAsyncCallback(fn, ctx, defaultTimeout);
 }
 
 module.exports = {

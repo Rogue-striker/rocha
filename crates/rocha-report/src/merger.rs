@@ -59,7 +59,7 @@ impl EventMerger {
 
     /// Push an event from a worker executing `file`.
     pub fn push(&mut self, file: &str, event: Event, reporter: &mut impl Reporter) {
-        if !self.spec_order.contains(&file.to_string()) {
+        if !self.spec_order.iter().any(|s| s == file) {
             self.spec_order.push(file.to_string());
         }
 
@@ -139,9 +139,14 @@ impl EventMerger {
             Event::Retry { .. } => {
                 self.summary.retries += 1;
             }
-            Event::TestPass { duration_ms, .. } => {
+            Event::TestPass {
+                id,
+                duration_ms,
+                ..
+            } => {
                 self.summary.passes += 1;
                 self.summary.duration_ms += duration_ms;
+                self.tests.remove(id);
             }
             Event::TestFail {
                 id,

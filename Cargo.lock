@@ -1989,7 +1989,7 @@ dependencies = [
 
 [[package]]
 name = "rocha-cli"
-version = "2.5.14"
+version = "2.5.15"
 dependencies = [
  "anyhow",
  "base64-simd",
@@ -2009,7 +2009,7 @@ dependencies = [
 
 [[package]]
 name = "rocha-config"
-version = "2.5.14"
+version = "2.5.15"
 dependencies = [
  "serde",
  "serde_json",
@@ -2020,7 +2020,7 @@ dependencies = [
 
 [[package]]
 name = "rocha-discover"
-version = "2.5.14"
+version = "2.5.15"
 dependencies = [
  "globset",
  "rocha-config",
@@ -2033,7 +2033,7 @@ dependencies = [
 
 [[package]]
 name = "rocha-protocol"
-version = "2.5.14"
+version = "2.5.15"
 dependencies = [
  "proptest",
  "rmp-serde",
@@ -2044,7 +2044,7 @@ dependencies = [
 
 [[package]]
 name = "rocha-report"
-version = "2.5.14"
+version = "2.5.15"
 dependencies = [
  "rocha-protocol",
  "serde",
@@ -2055,7 +2055,7 @@ dependencies = [
 
 [[package]]
 name = "rocha-sched"
-version = "2.5.14"
+version = "2.5.15"
 dependencies = [
  "blake3",
  "rocha-discover",
@@ -2073,7 +2073,7 @@ dependencies = [
 
 [[package]]
 name = "rocha-transform"
-version = "2.5.14"
+version = "2.5.15"
 dependencies = [
  "blake3",
  "oxc_allocator",
@@ -2093,7 +2093,7 @@ dependencies = [
 
 [[package]]
 name = "rocha-watch"
-version = "2.5.14"
+version = "2.5.15"
 dependencies = [
  "globset",
  "libc",
@@ -2107,7 +2107,7 @@ dependencies = [
 
 [[package]]
 name = "rocha-worker"
-version = "2.5.14"
+version = "2.5.15"
 dependencies = [
  "boa_engine",
  "rmp-serde",

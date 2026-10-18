@@ -36,6 +36,7 @@ impl<W: Write> Reporter for DotReporter<W> {
                     let _ = write!(self.writer, "  ");
                 } else if self.n.is_multiple_of(self.width) {
                     let _ = write!(self.writer, "\n  ");
+                    let _ = self.writer.flush();
                 }
                 let sym = if *slow {
                     color("bright yellow", Symbols::DOT, self.opts.use_colors)
@@ -43,7 +44,6 @@ impl<W: Write> Reporter for DotReporter<W> {
                     color("fast", Symbols::DOT, self.opts.use_colors)
                 };
                 let _ = write!(self.writer, "{}", sym);
-                let _ = self.writer.flush();
                 self.n += 1;
             }
             Event::TestFail { .. } => {
@@ -64,10 +64,10 @@ impl<W: Write> Reporter for DotReporter<W> {
                     let _ = write!(self.writer, "  ");
                 } else if self.n.is_multiple_of(self.width) {
                     let _ = write!(self.writer, "\n  ");
+                    let _ = self.writer.flush();
                 }
                 let sym = color("pending", Symbols::COMMA, self.opts.use_colors);
                 let _ = write!(self.writer, "{}", sym);
-                let _ = self.writer.flush();
                 self.n += 1;
             }
             _ => {}
@@ -76,6 +76,7 @@ impl<W: Write> Reporter for DotReporter<W> {
 
     fn finish(&mut self, summary: &Summary) -> io::Result<()> {
         writeln!(self.writer)?;
-        write_epilogue(&mut self.writer, summary, &self.opts)
+        write_epilogue(&mut self.writer, summary, &self.opts)?;
+        self.writer.flush()
     }
 }

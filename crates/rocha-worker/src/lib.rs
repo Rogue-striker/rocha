@@ -435,6 +435,35 @@ impl WorkerProcess {
         let mut buf = [0u8; 8192];
 
         loop {
+            // Drain any already decoded frames in memory immediately without timer or select overhead
+            while let Some(msg) = self.decoder.poll_next()? {
+                match &msg {
+                    WorkerMessage::TestStart { id, .. } => {
+                        active_test = Some((id.clone(), Instant::now()));
+                    }
+                    WorkerMessage::TestPass { id, .. }
+                    | WorkerMessage::TestFail { id, .. }
+                    | WorkerMessage::TestPending { id } => {
+                        if active_test.as_ref().map(|(tid, _)| tid) == Some(id) {
+                            active_test = None;
+                        }
+                    }
+                    WorkerMessage::FileDone { .. } => {
+                        on_event(&msg);
+                        return Ok(msg);
+                    }
+                    WorkerMessage::Fatal { error } => {
+                        on_event(&msg);
+                        return Err(WorkerError::WorkerCrashed {
+                            file: file.to_string(),
+                            message: error.message.clone(),
+                        });
+                    }
+                    _ => {}
+                }
+                on_event(&msg);
+            }
+
             let file_deadline = file_start + file_timeout;
             let test_deadline = active_test
                 .as_ref()
@@ -508,68 +537,24 @@ impl WorkerProcess {
                     on_event(&done_msg);
                     return Ok(done_msg);
                 }
-                res = self.read_frame_or_data(&mut buf) => {
-                    match res? {
-                        Some(msg) => {
-                            match &msg {
-                                WorkerMessage::TestStart { id, .. } => {
-                                    active_test = Some((id.clone(), Instant::now()));
-                                }
-                                WorkerMessage::TestPass { id, .. }
-                                | WorkerMessage::TestFail { id, .. }
-                                | WorkerMessage::TestPending { id } => {
-                                    if active_test.as_ref().map(|(tid, _)| tid) == Some(id) {
-                                        active_test = None;
-                                    }
-                                }
-                                WorkerMessage::FileDone { .. } => {
-                                    on_event(&msg);
-                                    return Ok(msg);
-                                }
-                                WorkerMessage::Fatal { error } => {
-                                    on_event(&msg);
-                                    return Err(WorkerError::WorkerCrashed {
-                                        file: file.to_string(),
-                                        message: error.message.clone(),
-                                    });
-                                }
-                                _ => {}
-                            }
-                            on_event(&msg);
-                        }
-                        None => {
-                            let stderr_msg =
-                                String::from_utf8_lossy(&self.stderr_captured.lock().await).to_string();
-                            let exit_status = self
-                                .child
-                                .try_wait()?
-                                .map(|s| s.to_string())
-                                .unwrap_or_else(|| "terminated".into());
-                            return Err(WorkerError::WorkerCrashed {
-                                file: file.to_string(),
-                                message: format!("Exit status {}. Stderr: {}", exit_status, stderr_msg),
-                            });
-                        }
+                res = self.stdout.read(&mut buf) => {
+                    let n = res?;
+                    if n == 0 {
+                        let stderr_msg =
+                            String::from_utf8_lossy(&self.stderr_captured.lock().await).to_string();
+                        let exit_status = self
+                            .child
+                            .try_wait()?
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| "terminated".into());
+                        return Err(WorkerError::WorkerCrashed {
+                            file: file.to_string(),
+                            message: format!("Exit status {}. Stderr: {}", exit_status, stderr_msg),
+                        });
                     }
+                    self.decoder.feed(&buf[..n]);
                 }
             }
         }
-    }
-
-    async fn read_frame_or_data(
-        &mut self,
-        buf: &mut [u8; 8192],
-    ) -> Result<Option<WorkerMessage>, WorkerError> {
-        if let Some(msg) = self.decoder.poll_next()? {
-            return Ok(Some(msg));
-        }
-
-        let n = self.stdout.read(buf).await?;
-        if n == 0 {
-            return Ok(None);
-        }
-        self.decoder.feed(&buf[..n]);
-
-        Ok(self.decoder.poll_next()?)
     }
 }

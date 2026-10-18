@@ -58,11 +58,14 @@ class Test {
   }
 
   fullTitle() {
+    if (this._cachedFullTitle !== undefined) return this._cachedFullTitle;
     if (!this.suite || !this.suite.title) {
-      return this.title;
+      this._cachedFullTitle = this.title;
+    } else {
+      const parentTitle = this.suite.fullTitle();
+      this._cachedFullTitle = parentTitle ? `${parentTitle} ${this.title}` : this.title;
     }
-    const parentTitle = this.suite.fullTitle();
-    return parentTitle ? `${parentTitle} ${this.title}` : this.title;
+    return this._cachedFullTitle;
   }
 }
 
@@ -150,11 +153,14 @@ class Suite {
   }
 
   fullTitle() {
+    if (this._cachedFullTitle !== undefined) return this._cachedFullTitle;
     if (!this.parent || !this.parent.title) {
-      return this.title;
+      this._cachedFullTitle = this.title;
+    } else {
+      const parentTitle = this.parent.fullTitle();
+      this._cachedFullTitle = parentTitle ? `${parentTitle} ${this.title}` : this.title;
     }
-    const parentTitle = this.parent.fullTitle();
-    return parentTitle ? `${parentTitle} ${this.title}` : this.title;
+    return this._cachedFullTitle;
   }
 
   addSuite(suite) {

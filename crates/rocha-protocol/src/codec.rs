@@ -49,6 +49,7 @@ pub fn encode_frame<T: Serialize>(msg: &T) -> Result<Vec<u8>, CodecError> {
 #[derive(Debug, Default)]
 pub struct StreamingDecoder<T> {
     buffer: Vec<u8>,
+    cursor: usize,
     _marker: std::marker::PhantomData<T>,
 }
 
@@ -57,12 +58,22 @@ impl<T: DeserializeOwned> StreamingDecoder<T> {
     pub fn new() -> Self {
         Self {
             buffer: Vec::new(),
+            cursor: 0,
             _marker: std::marker::PhantomData,
         }
     }
 
     /// Feed an arbitrary chunk of raw bytes into the decoder buffer.
     pub fn feed(&mut self, chunk: &[u8]) {
+        if self.cursor > 0 {
+            if self.cursor == self.buffer.len() {
+                self.buffer.clear();
+                self.cursor = 0;
+            } else if self.cursor >= 8192 {
+                self.buffer.drain(0..self.cursor);
+                self.cursor = 0;
+            }
+        }
         self.buffer.extend_from_slice(chunk);
     }
 
@@ -73,11 +84,16 @@ impl<T: DeserializeOwned> StreamingDecoder<T> {
     /// - `Ok(None)` when more data is needed to complete the next frame.
     /// - `Err(CodecError)` if the frame header is oversized or deserialization fails.
     pub fn poll_next(&mut self) -> Result<Option<T>, CodecError> {
-        if self.buffer.len() < 4 {
+        let remaining = self.buffer.len() - self.cursor;
+        if remaining < 4 {
             return Ok(None);
         }
 
-        let frame_len = u32::from_le_bytes(self.buffer[0..4].try_into().unwrap()) as usize;
+        let frame_len = u32::from_le_bytes(
+            self.buffer[self.cursor..self.cursor + 4]
+                .try_into()
+                .unwrap(),
+        ) as usize;
         if frame_len > MAX_FRAME_SIZE {
             return Err(CodecError::OversizedFrame {
                 size: frame_len,
@@ -86,21 +102,25 @@ impl<T: DeserializeOwned> StreamingDecoder<T> {
         }
 
         let total_frame_len = 4 + frame_len;
-        if self.buffer.len() < total_frame_len {
+        if remaining < total_frame_len {
             // Need more data
             return Ok(None);
         }
 
         // Complete frame ready to decode
-        let payload = &self.buffer[4..total_frame_len];
+        let payload = &self.buffer[self.cursor + 4..self.cursor + total_frame_len];
         let message = rmp_serde::from_slice(payload)?;
-        self.buffer.drain(0..total_frame_len);
+        self.cursor += total_frame_len;
+        if self.cursor == self.buffer.len() {
+            self.buffer.clear();
+            self.cursor = 0;
+        }
         Ok(Some(message))
     }
 
     /// Number of bytes currently remaining in the unparsed buffer.
     pub fn buffered_len(&self) -> usize {
-        self.buffer.len()
+        self.buffer.len() - self.cursor
     }
 }
 

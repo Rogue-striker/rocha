@@ -301,13 +301,32 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
+    let mut files_to_run_first = config.file.clone();
+    for f in &args.file {
+        if !files_to_run_first.contains(f) {
+            files_to_run_first.push(f.clone());
+        }
+    }
+
+    let has_ts = files.iter().any(|f| {
+        if let Some(ext) = f.extension().and_then(|e| e.to_str()) {
+            matches!(ext, "ts" | "tsx" | "mts" | "cts")
+        } else {
+            false
+        }
+    }) || files_to_run_first.iter().any(|f| {
+        f.ends_with(".ts") || f.ends_with(".tsx") || f.ends_with(".mts") || f.ends_with(".cts")
+    }) || !loaders.is_empty() || !imports.is_empty();
+
+    let resolved_loader_path = if has_ts && loader_path.exists() {
+        Some(loader_path)
+    } else {
+        None
+    };
+
     let worker_config = WorkerConfig {
         node_path,
-        loader_path: if loader_path.exists() {
-            Some(loader_path)
-        } else {
-            None
-        },
+        loader_path: resolved_loader_path,
         harness_worker_path,
         node_options,
         requires,
@@ -315,13 +334,6 @@ async fn main() -> anyhow::Result<()> {
         loaders,
         ..Default::default()
     };
-
-    let mut files_to_run_first = config.file.clone();
-    for f in &args.file {
-        if !files_to_run_first.contains(f) {
-            files_to_run_first.push(f.clone());
-        }
-    }
 
     // 6. Scheduler configuration
     let default_parallel_cpus = std::thread::available_parallelism()
@@ -462,7 +474,11 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let run_res: Result<rocha_report::Summary, anyhow::Error> =
-        match create_reporter(reporter_name, std::io::stdout(), reporter_opts) {
+        match create_reporter(
+            reporter_name,
+            std::io::BufWriter::with_capacity(32768, std::io::stdout()),
+            reporter_opts,
+        ) {
             Ok(mut rep) => {
                 for ev in &embedded_events {
                     rep.on_event(ev);

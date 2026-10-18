@@ -197,8 +197,9 @@ class Runner extends EventEmitter {
       return;
     }
 
-    const suiteContext = new Context(suite);
-    Object.assign(suiteContext, parentContext);
+    const suiteContext = Object.create(parentContext);
+    suiteContext.test = suite;
+    suiteContext._runnable = suite;
 
     if (!isRoot) {
       this.stats.suites++;
@@ -214,11 +215,15 @@ class Runner extends EventEmitter {
         if (this._bailed) break;
         this.emit("hook", hook);
         if (this.options.dryRun) break;
-        const hookCtx = new Context(hook);
-        Object.assign(hookCtx, suiteContext);
+        const hookCtx = Object.create(suiteContext);
+        hookCtx.test = hook;
+        hookCtx._runnable = hook;
         hookCtx.allowUncaught = this.options.allowUncaught;
         try {
-          await executeRunnable(hook.fn, hookCtx, hook.timeout || (typeof suite.timeout === "function" ? suite.timeout() : suite.timeout));
+          const res = executeRunnable(hook.fn, hookCtx, hook.timeout || (typeof suite.timeout === "function" ? suite.timeout() : suite.timeout));
+          if (res && typeof res.then === "function") {
+            await res;
+          }
         } catch (err) {
           if (err instanceof PendingError) {
             suiteSkipped = true;
@@ -320,13 +325,12 @@ class Runner extends EventEmitter {
 
         while (true) {
           stepFailed = false;
-          const testContext = new Context(test);
-          Object.assign(testContext, suiteContext);
+          const testContext = Object.create(suiteContext);
           testContext.test = test;
           testContext._runnable = test;
           testContext.allowUncaught = this.options.allowUncaught;
-          testContext._timeout = test.timeout !== undefined ? test.timeout : 2000;
-          testContext._slow = test.slow !== undefined ? test.slow : 75;
+          testContext._timeout = test.timeout !== undefined ? test.timeout : (suiteContext._timeout || 2000);
+          testContext._slow = test.slow !== undefined ? test.slow : (suiteContext._slow || 75);
           testContext._retries = typeof suiteContext._retries === "number" && suiteContext._retries > 0 
             ? suiteContext._retries 
             : (typeof test.retries === "number" && test.retries > 0 ? test.retries : (this.options.retries || 0));
@@ -351,7 +355,10 @@ class Runner extends EventEmitter {
             this.emit("hook", hook);
             testContext._runnable = hook;
             try {
-              await executeRunnable(hook.fn, testContext, hook.timeout || test.timeout);
+              const res = executeRunnable(hook.fn, testContext, hook.timeout || test.timeout);
+              if (res && typeof res.then === "function") {
+                await res;
+              }
             } catch (err) {
               if (err instanceof PendingError) {
                 testSkipped = true;
@@ -372,7 +379,10 @@ class Runner extends EventEmitter {
           if (!stepFailed) {
             testContext._runnable = test;
             try {
-              await executeRunnable(test.fn, testContext, testContext._timeout);
+              const res = executeRunnable(test.fn, testContext, testContext._timeout);
+              if (res && typeof res.then === "function") {
+                await res;
+              }
               testPassed = true;
             } catch (err) {
               if (err instanceof PendingError) {
@@ -391,7 +401,10 @@ class Runner extends EventEmitter {
             this.emit("hook", hook);
             testContext._runnable = hook;
             try {
-              await executeRunnable(hook.fn, testContext, hook.timeout || test.timeout);
+              const res = executeRunnable(hook.fn, testContext, hook.timeout || test.timeout);
+              if (res && typeof res.then === "function") {
+                await res;
+              }
             } catch (err) {
               if (!stepFailed) {
                 stepFailed = true;
@@ -474,10 +487,14 @@ class Runner extends EventEmitter {
     if (Array.isArray(suite._afterAll)) {
       for (const hook of suite._afterAll) {
         this.emit("hook", hook);
-        const hookCtx = new Context(hook);
-        Object.assign(hookCtx, suiteContext);
+        const hookCtx = Object.create(suiteContext);
+        hookCtx.test = hook;
+        hookCtx._runnable = hook;
         try {
-          await executeRunnable(hook.fn, hookCtx, hook.timeout || (typeof suite.timeout === "function" ? suite.timeout() : suite.timeout));
+          const res = executeRunnable(hook.fn, hookCtx, hook.timeout || (typeof suite.timeout === "function" ? suite.timeout() : suite.timeout));
+          if (res && typeof res.then === "function") {
+            await res;
+          }
         } catch (err) {
           this.stats.failures++;
           this.failures.push({

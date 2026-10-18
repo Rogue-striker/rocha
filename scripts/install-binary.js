@@ -18,7 +18,7 @@ function getPackageVersion() {
       if (pkg.version) return pkg.version;
     }
   } catch (_) {}
-  return '2.5.14';
+  return '2.5.15';
 }
 
 function getTargetTriple(platform = process.platform, arch = process.arch) {
