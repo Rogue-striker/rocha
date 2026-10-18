@@ -1,5 +1,5 @@
 {
-  "version": "2.5.12",
+  "version": "2.5.13",
   "provenance": {
     "repository": "https://github.com/Rogue-striker/rocha",
     "builder": "cargo-dist",
@@ -7,27 +7,27 @@
   },
   "targets": {
     "x86_64-unknown-linux-gnu": {
-      "archive": "rocha-v2.5.12-x86_64-unknown-linux-gnu.tar.gz",
+      "archive": "rocha-v2.5.13-x86_64-unknown-linux-gnu.tar.gz",
       "binary": "rocha",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     "aarch64-unknown-linux-gnu": {
-      "archive": "rocha-v2.5.12-aarch64-unknown-linux-gnu.tar.gz",
+      "archive": "rocha-v2.5.13-aarch64-unknown-linux-gnu.tar.gz",
       "binary": "rocha",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     "x86_64-apple-darwin": {
-      "archive": "rocha-v2.5.12-x86_64-apple-darwin.tar.gz",
+      "archive": "rocha-v2.5.13-x86_64-apple-darwin.tar.gz",
       "binary": "rocha",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     "aarch64-apple-darwin": {
-      "archive": "rocha-v2.5.12-aarch64-apple-darwin.tar.gz",
+      "archive": "rocha-v2.5.13-aarch64-apple-darwin.tar.gz",
       "binary": "rocha",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     "x86_64-pc-windows-msvc": {
-      "archive": "rocha-v2.5.12-x86_64-pc-windows-msvc.zip",
+      "archive": "rocha-v2.5.13-x86_64-pc-windows-msvc.zip",
       "binary": "rocha.exe",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     }

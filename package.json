@@ -1,6 +1,6 @@
 {
   "name": "@rogue-striker/rocha",
-  "version": "2.5.12",
+  "version": "2.5.13",
   "publishConfig": {
     "access": "public"
   },
